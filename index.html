@@ -970,7 +970,8 @@ function novoProjeto(){
   return { id:uid(), criadoEm:new Date().toISOString(), dono:user?user.nome:"", nome:"",
     imovel:{proprietario:"",matricula:"",comarca:"",cartorio:"",municipioUf:"",denominacao:"",area:"",perimetro:""},
     levantamento:{datum:"SIRGAS 2000",metodo:"",vertices:"",confrontantes:""},
-    pecas:{}, obs:"" , tipo:"", status:"Aberto", dataEntrada:(new Date().toISOString().slice(0,10)), dataConclusao:"", parceirosAtribuidos:[], arquivos:[], movimentos:[], providencias:[], _novo:true };
+    pecas:{}, obs:"" , tipo:"", status:"Aberto", dataEntrada:(new Date().toISOString().slice(0,10)), dataConclusao:"", parceirosAtribuidos:[], arquivos:[], movimentos:[], providencias:[],
+    produtor:{nome:"", fone:"", acessoToken:"", acessoCriadoEm:""}, _novo:true };
 }
 var PROJ_STATUS=["Aberto","Em andamento","Aguardando","Concluído"];
 function podeVerProj(p){ return ehMaster()||eqNome(p.dono,user.nome)||estaAtribuido(p); }
@@ -1000,6 +1001,10 @@ function projFormHtml(){
         '<div><label class="f">Status</label><select onchange="setProj(\'status\',this.value)">'+PROJ_STATUS.map(function(s){return '<option value="'+esc(s)+'" '+((p.status||"Aberto")===s?"selected":"")+'>'+esc(s)+'</option>';}).join("")+'</select></div>'+
         '<div><label class="f">Data de entrada</label><input type="date" value="'+esc(p.dataEntrada||"")+'" oninput="setProj(\'dataEntrada\',this.value)"></div>'+
         '<div><label class="f">Data de conclusão</label><input type="date" value="'+esc(p.dataConclusao||"")+'" oninput="setProj(\'dataConclusao\',this.value)"></div></div></div>'+
+    '<div class="card"><h2>👨‍🌾 Produtor (cliente do app)</h2>'+
+      '<p class="muted small">Preencha para poder <b>gerar o acesso do produtor</b> (link mágico) direto do projeto.</p>'+
+      '<div class="grid g2">'+inpP("Nome do produtor","produtor.nome",(p.produtor&&p.produtor.nome)||"")+
+      inpP("WhatsApp (com DDD)","produtor.fone",(p.produtor&&p.produtor.fone)||"")+'</div></div>'+
     '<div class="card"><h2>Dados do imóvel</h2><div class="grid g2">'+
       inpP("Proprietário","imovel.proprietario",p.imovel.proprietario)+inpP("Matrícula","imovel.matricula",p.imovel.matricula)+
       inpP("Comarca","imovel.comarca",p.imovel.comarca)+inpP("Cartório (CRI)","imovel.cartorio",p.imovel.cartorio)+
@@ -1091,29 +1096,57 @@ function projVerHtml(){
     (movs.length?movs.map(function(m){return '<div class="mov"><div class="muted small">'+brDH(m.quando)+' · '+esc(m.quem||"")+'</div><div style="white-space:pre-wrap">'+esc(m.texto)+'</div></div>';}).join(""):'<div class="muted small">Sem andamentos ainda.</div>')+'</div>';
   // Acesso do produtor (link mágico, sem e-mail)
   if(pode){
+    var pd=p.produtor||{};
+    var infoProd=(pd.nome||pd.fone)?('<div class="kv"><span>👤 '+esc(pd.nome||"—")+'</span><span>'+(pd.fone?('📱 '+esc(pd.fone)):'')+'</span></div>'):'<div class="muted small">Preencha o nome e o WhatsApp do produtor em <b>Editar</b> para agilizar.</div>';
+    var acoes = pd.acessoToken
+      ? '<div class="row" style="gap:8px;flex-wrap:wrap"><span class="pill ok">✅ Acesso gerado'+(pd.acessoCriadoEm?(' · '+brData(pd.acessoCriadoEm)):'')+'</span>'+
+        '<button class="btn sm" onclick="reenviarAcessoProdutor(\''+p.id+'\')">📲 Reenviar por WhatsApp</button>'+
+        '<button class="btn sm sec" onclick="copiarLinkProdutor(\''+p.id+'\')">🔗 Copiar link</button>'+
+        '<button class="btn sm sec" onclick="gerarAcessoProdutor(\''+p.id+'\')">↻ Gerar novo</button></div>'
+      : '<button class="btn" onclick="gerarAcessoProdutor(\''+p.id+'\')">🔑 Gerar acesso do produtor</button>';
     h+='<div class="card"><h2>👨‍🌾 Acesso do produtor</h2>'+
-      '<p class="muted small">Gere um link para o produtor <b>entrar e instalar o app</b>. Ele abre o link, cria a própria senha de 4 dígitos e pronto — <b>sem e-mail</b>. Envie por WhatsApp.</p>'+
-      '<button class="btn" onclick="gerarAcessoProdutor(\''+p.id+'\')">🔑 Gerar acesso do produtor</button></div>';
+      '<p class="muted small">O produtor abre o link, cria a própria senha de 4 dígitos e instala o app — <b>sem e-mail</b>. Enviado por WhatsApp.</p>'+
+      infoProd+'<div style="height:8px"></div>'+acoes+'</div>';
   }
   // Peças + gerar
   h+='<div class="card"><h2>Peças selecionadas</h2>'+(pecas.length?pecas.map(function(x){return '<span class="pill azul" style="margin:2px">'+esc(x)+'</span>';}).join(" "):'<span class="muted small">Nenhuma.</span>')+'</div>'+
     '<div class="card"><h2>Gerar</h2><div class="row"><button class="btn azul" onclick="gerarPecas(\''+p.id+'\')">⚙️ Gerar peças (servidor)</button><button class="btn sec" onclick="baixarProjeto(\''+p.id+'\')">⬇️ Salvar no PC</button></div></div>';
   return h;
 }
+function msgConviteProdutor(nome, link){
+  return "Olá "+nome+"! Você foi convidado para acessar o *"+(cfg.brand||"sistema")+"*.\n\n"+
+    "1) Abra este link no celular:\n"+link+"\n\n"+
+    "2) Crie sua senha de 4 números (guarde bem).\n\n"+
+    "3) O app mostra como instalar na tela do celular.\n\nQualquer dúvida, é só chamar.";
+}
 function gerarAcessoProdutor(id){
-  var p=projById(id); if(!p)return;
-  var nome=prompt("Nome do produtor:", (p.imovel&&p.imovel.proprietario)||""); if(nome===null)return; nome=nome.trim(); if(!nome){ alert("Informe o nome do produtor."); return; }
-  var fone=prompt("WhatsApp do produtor (com DDD, só números):",""); if(fone===null)return; fone=(fone||"").replace(/\D/g,"");
+  var p=projById(id); if(!p||!podeEditarProj(p))return;
+  var pd=p.produtor||{};
+  var nome=prompt("Nome do produtor:", pd.nome||(p.imovel&&p.imovel.proprietario)||""); if(nome===null)return; nome=nome.trim(); if(!nome){ alert("Informe o nome do produtor."); return; }
+  var fone=prompt("WhatsApp do produtor (com DDD, só números):", pd.fone||""); if(fone===null)return; fone=(fone||"").replace(/\D/g,"");
   apiPost('criarAcessoProdutor',{nome:nome, fone:fone, projetoId:id}).then(function(r){
     if(!r||r.erro){ alert((r&&r.erro)||"Falha ao gerar o acesso."); return; }
+    if(!p.produtor)p.produtor={}; p.produtor.nome=nome; p.produtor.fone=fone; p.produtor.acessoToken=r.token; p.produtor.acessoCriadoEm=new Date().toISOString();
+    registrarMov(p,"Acesso do produtor gerado para "+nome);
+    apiSalvarDoc('projetos',p);
     var link=APP_BASE+"?c="+encodeURIComponent(r.token);
-    var msg="Olá "+r.nome+"! Você foi convidado para acessar o *"+(cfg.brand||"sistema")+"*.\n\n"+
-      "1) Abra este link no celular:\n"+link+"\n\n"+
-      "2) Crie sua senha de 4 números (guarde bem).\n\n"+
-      "3) O app mostra como instalar na tela do celular.\n\nQualquer dúvida, é só chamar.";
-    if(fone){ if(confirm("Acesso criado para "+r.nome+"!\n\nEnviar o convite por WhatsApp agora?")){ abrirWa2(fone, msg); } }
+    if(fone){ if(confirm("Acesso criado para "+nome+"!\n\nEnviar o convite por WhatsApp agora?")){ abrirWa2(fone, msgConviteProdutor(nome, link)); } }
     else { prompt("Acesso criado! Copie e envie este link para o produtor:", link); }
+    render();
   });
+}
+function reenviarAcessoProdutor(id){
+  var p=projById(id); if(!p)return; var pd=p.produtor||{};
+  if(!pd.acessoToken){ gerarAcessoProdutor(id); return; }
+  var link=APP_BASE+"?c="+encodeURIComponent(pd.acessoToken);
+  var fone=(pd.fone||"").replace(/\D/g,"");
+  if(fone){ abrirWa2(fone, msgConviteProdutor(pd.nome||"produtor", link)); }
+  else { prompt("Link de acesso do produtor (copie e envie):", link); }
+}
+function copiarLinkProdutor(id){
+  var p=projById(id); if(!p||!p.produtor||!p.produtor.acessoToken)return;
+  var link=APP_BASE+"?c="+encodeURIComponent(p.produtor.acessoToken);
+  try{ navigator.clipboard.writeText(link); alert("Link copiado!"); }catch(e){ prompt("Link:", link); }
 }
 function addArqProj(id){ var p=projById(id); if(!p||!podeEditarProj(p))return; var nome=prompt("Nome do documento (ex.: Matrícula 6577):"); if(!nome)return; var link=prompt("Cole o LINK do arquivo (Drive/WhatsApp) — opcional:","")||""; if(!p.arquivos)p.arquivos=[]; p.arquivos.push({nome:nome,link:link,quem:user.nome,quando:new Date().toISOString()}); registrarMov(p,"Documento anexado: "+nome); apiSalvarDoc('projetos',p); render(); }
 function anexarArqProjFile(id,inp){
