@@ -297,7 +297,7 @@ function apiConfig(chave,valor){ return apiPost('salvarConfig',{chave:chave,valo
 // carrega config pública (marca) p/ a tela de login
 function carregarCfg(){
   return fetch(API_URL+'?action=config&k='+encodeURIComponent(API_SECRET)).then(function(r){return r.json();})
-    .then(function(c){ if(c&&!c.erro){ cfg.brand=c.brand||'Agroteca'; cfg.tagline=c.tagline||''; cfg.bloqueados=c.bloqueados||[]; } }).catch(function(){});
+    .then(function(c){ if(c&&!c.erro){ cfg.brand=c.brand||'Agroteca'; cfg.tagline=c.tagline||''; cfg.bloqueados=c.bloqueados||[]; if(c.logo!==undefined) cfg.logo=c.logo||''; } }).catch(function(){});
 }
 // carrega todas as coleções após o login numa ÚNICA chamada (rápido)
 function carregarDados(){ return carregarComRetry_(3); }
