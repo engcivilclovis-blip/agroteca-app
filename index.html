@@ -297,10 +297,13 @@ function apiConfig(chave,valor){ return apiPost('salvarConfig',{chave:chave,valo
 // carrega config pública (marca) p/ a tela de login
 function carregarCfg(){
   return fetch(API_URL+'?action=config&k='+encodeURIComponent(API_SECRET)).then(function(r){return r.json();})
-    .then(function(c){ if(c&&!c.erro){ cfg.brand=c.brand||'Agroteca'; cfg.tagline=c.tagline||''; cfg.bloqueados=c.bloqueados||[]; if(c.logo!==undefined) cfg.logo=c.logo||''; aplicarTituloGuia(); } }).catch(function(){});
+    .then(function(c){ if(c&&!c.erro){ cfg.brand=c.brand||'Agroteca'; cfg.tagline=c.tagline||''; cfg.bloqueados=c.bloqueados||[]; if(c.logo!==undefined) cfg.logo=c.logo||''; aplicarTituloGuia(); salvarMarcaCache(); } }).catch(function(){});
 }
 // título da guia do navegador = nome da marca
 function aplicarTituloGuia(){ try{ document.title=(cfg.brand||'AGROTECA')+(cfg.tagline?(' — '+cfg.tagline):''); }catch(e){} }
+// cache da marca (nome+slogan+logo) no aparelho — aparece na hora na próxima abertura, sem "flash" do AGROTECA
+function salvarMarcaCache(){ try{ localStorage.setItem('agt_marca', JSON.stringify({brand:cfg.brand||'', tagline:cfg.tagline||'', logo:cfg.logo||''})); }catch(e){} }
+function carregarMarcaCache(){ try{ var mc=JSON.parse(localStorage.getItem('agt_marca')||'null'); if(mc){ if(mc.brand)cfg.brand=mc.brand; if(mc.tagline!==undefined)cfg.tagline=mc.tagline; if(mc.logo!==undefined)cfg.logo=mc.logo; } }catch(e){} }
 // carrega todas as coleções após o login numa ÚNICA chamada (rápido)
 function carregarDados(){ return carregarComRetry_(3); }
 function carregarComRetry_(tentativas){
@@ -2688,6 +2691,8 @@ function salvarModulos(id){
   }catch(e){}
 })();
 cfg={brand:"AGROTECA", tagline:"Gestão rural digital e integrada", bloqueados:[]};
+carregarMarcaCache();   // marca/logo do cache aparecem já no 1º render (sem flash do AGROTECA)
+aplicarTituloGuia();
 render();
 carregarCfg().then(function(){
   var s=null; try{ s=JSON.parse(localStorage.getItem('agt_sess')||'null'); }catch(e){}
