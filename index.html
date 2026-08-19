@@ -297,8 +297,10 @@ function apiConfig(chave,valor){ return apiPost('salvarConfig',{chave:chave,valo
 // carrega config pública (marca) p/ a tela de login
 function carregarCfg(){
   return fetch(API_URL+'?action=config&k='+encodeURIComponent(API_SECRET)).then(function(r){return r.json();})
-    .then(function(c){ if(c&&!c.erro){ cfg.brand=c.brand||'Agroteca'; cfg.tagline=c.tagline||''; cfg.bloqueados=c.bloqueados||[]; if(c.logo!==undefined) cfg.logo=c.logo||''; } }).catch(function(){});
+    .then(function(c){ if(c&&!c.erro){ cfg.brand=c.brand||'Agroteca'; cfg.tagline=c.tagline||''; cfg.bloqueados=c.bloqueados||[]; if(c.logo!==undefined) cfg.logo=c.logo||''; aplicarTituloGuia(); } }).catch(function(){});
 }
+// título da guia do navegador = nome da marca
+function aplicarTituloGuia(){ try{ document.title=(cfg.brand||'AGROTECA')+(cfg.tagline?(' — '+cfg.tagline):''); }catch(e){} }
 // carrega todas as coleções após o login numa ÚNICA chamada (rápido)
 function carregarDados(){ return carregarComRetry_(3); }
 function carregarComRetry_(tentativas){
@@ -2623,7 +2625,7 @@ function masterHtml(){
     precosCardHtml()+
     trilhaCardHtml();
 }
-function salvarMarca(){ cfg.brand=document.getElementById("cfgBrand").value.trim()||"Agroteca"; cfg.tagline=document.getElementById("cfgTag").value.trim(); salvarCfg(); render(); }
+function salvarMarca(){ cfg.brand=document.getElementById("cfgBrand").value.trim()||"Agroteca"; cfg.tagline=document.getElementById("cfgTag").value.trim(); salvarCfg(); aplicarTituloGuia(); render(); }
 function subirLogo(){
   var f=document.getElementById("logoFile"); if(!f||!f.files||!f.files[0])return;
   var file=f.files[0];
