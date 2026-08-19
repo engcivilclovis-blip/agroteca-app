@@ -2,7 +2,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#2D6A4F">
+<meta name="theme-color" content="#0f2a63">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -13,8 +13,8 @@
 <title>Sistema de Gestão</title>
 <style>
   :root{
-    --bg:#eef3ef; --card:#ffffff; --ink:#212529; --muted:#5f6f68;
-    --line:#dbe4de; --brand:#2D6A4F; --brand-dark:#1B4332; --brand2:#1B4332; --azul:#0077B6; --tan:#D4A373;
+    --bg:#eef2f8; --card:#ffffff; --ink:#0f1e33; --muted:#5f6b7a;
+    --line:#d8e1ef; --brand:#1d4ed8; --brand-dark:#0f2a63; --brand2:#0f2a63; --azul:#0aa2dc; --tan:#D4A373;
     --ok:#166534; --okbg:#dcfce7; --warn:#8a5a12; --warnbg:#fdf3d6;
     --erro:#991b1b; --errobg:#fee2e2; --neutro:#6b7280; --neutrobg:#eef2f0;
   }
@@ -274,7 +274,7 @@ function gerarIconeQuadrado(logoSrc, size, cb){
 function _aplicarManifesto(nome, curto, icon512){
   try{
     var man={ name:nome, short_name:curto, start_url:'./', scope:'./', display:'standalone', orientation:'portrait',
-      background_color:'#ffffff', theme_color:'#2D6A4F',
+      background_color:'#ffffff', theme_color:"#0f2a63",
       icons: icon512 ? [
         {src:icon512, sizes:'192x192', type:'image/png', purpose:'any'},
         {src:icon512, sizes:'512x512', type:'image/png', purpose:'any'},
@@ -629,10 +629,10 @@ function renderMain(){
 function logoPadraoSVG(px){
   var h=px||48;
   return '<svg viewBox="0 0 400 120" height="'+h+'" style="vertical-align:middle;max-width:100%" xmlns="http://www.w3.org/2000/svg">'+
-    '<path d="M 40 80 C 20 60, 20 30, 40 20 C 60 30, 70 50, 70 80 Z" fill="#2D6A4F"/>'+
+    '<path d="M 40 80 C 20 60, 20 30, 40 20 C 60 30, 70 50, 70 80 Z" fill="#0f2a63"/>'+
     '<circle cx="70" cy="50" r="15" fill="#0077B6" opacity="0.92"/>'+
     '<path d="M 55 50 L 70 65 L 90 35" stroke="#FFFFFF" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'+
-    '<text x="105" y="70" font-family="Inter,sans-serif" font-weight="900" font-size="48" fill="#2D6A4F">SIS</text>'+
+    '<text x="105" y="70" font-family="Inter,sans-serif" font-weight="900" font-size="48" fill="#0f2a63">SIS</text>'+
     '<text x="245" y="70" font-family="Inter,sans-serif" font-weight="900" font-size="48" fill="#0077B6">TEMA</text>'+
     '<text x="108" y="95" font-family="Inter,sans-serif" font-weight="500" font-size="14" fill="#212529" letter-spacing="1">SISTEMA</text></svg>';
 }
@@ -651,7 +651,7 @@ function logoHtml(px){
 function iconeMarca(px){
   var h=px||64;
   return '<svg viewBox="0 0 100 100" height="'+h+'" style="vertical-align:middle" xmlns="http://www.w3.org/2000/svg">'+
-    '<path d="M 40 80 C 20 60, 20 30, 40 20 C 60 30, 70 50, 70 80 Z" fill="#2D6A4F"/>'+
+    '<path d="M 40 80 C 20 60, 20 30, 40 20 C 60 30, 70 50, 70 80 Z" fill="#0f2a63"/>'+
     '<circle cx="70" cy="50" r="15" fill="#0077B6" opacity="0.92"/>'+
     '<path d="M 55 50 L 70 65 L 90 35" stroke="#FFFFFF" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 }
@@ -1433,7 +1433,7 @@ function parcExtrato(id){
   var linhas=(t.movimentos||[]).map(function(m){return '<tr><td>'+esc(brDH(m.quando))+'</td><td>'+esc(m.quem)+'</td><td>'+esc(m.texto)+'</td></tr>';}).join("")||'<tr><td colspan="3">Sem movimentações.</td></tr>';
   var ent=(t.entregas||[]).map(function(e){return '<li>'+esc(e.nome)+(e.link?(' — '+esc(e.link)):'')+' ('+esc(brData(e.quando))+')</li>';}).join("")||'<li>—</li>';
   var w=window.open("","_blank"); if(!w){alert("Permita pop-ups para gerar o extrato.");return;}
-  w.document.write('<html><head><meta charset="utf-8"><title>Extrato — '+esc(t.titulo)+'</title><style>body{font-family:Arial,sans-serif;color:#1a1a1a;padding:24px;max-width:800px;margin:auto}h1{color:#1B4332;font-size:20px}h2{font-size:15px;color:#2D6A4F;border-bottom:1px solid #ccc;padding-bottom:4px;margin-top:22px}table{width:100%;border-collapse:collapse;font-size:13px}td,th{border:1px solid #ddd;padding:6px 8px;text-align:left;vertical-align:top}th{background:#f0f4f0}.kv{font-size:13px;margin:3px 0}.kv b{display:inline-block;min-width:150px;color:#555}.foot{margin-top:26px;font-size:11px;color:#888}</style></head><body>'+
+  w.document.write('<html><head><meta charset="utf-8"><title>Extrato — '+esc(t.titulo)+'</title><style>body{font-family:Arial,sans-serif;color:#1a1a1a;padding:24px;max-width:800px;margin:auto}h1{color:#1B4332;font-size:20px}h2{font-size:15px;color:#0f2a63;border-bottom:1px solid #ccc;padding-bottom:4px;margin-top:22px}table{width:100%;border-collapse:collapse;font-size:13px}td,th{border:1px solid #ddd;padding:6px 8px;text-align:left;vertical-align:top}th{background:#f0f4f0}.kv{font-size:13px;margin:3px 0}.kv b{display:inline-block;min-width:150px;color:#555}.foot{margin-top:26px;font-size:11px;color:#888}</style></head><body>'+
     '<h1>'+esc(cfg.brand||"Sistema")+' — Extrato de andamento</h1>'+
     '<div class="kv"><b>Serviço:</b> '+esc(t.titulo||"—")+'</div><div class="kv"><b>Tipo:</b> '+esc(parcTipoLabel(t.tipo))+'</div>'+
     '<div class="kv"><b>Parceiro:</b> '+esc(t.parceiro||"—")+'</div><div class="kv"><b>Cliente:</b> '+esc(t.cliente.nome||"—")+'</div>'+
@@ -2854,7 +2854,7 @@ function salvarModulos(id){
 // PWA: meta tags que o Apps Script NÃO permite via addMetaTag são injetadas aqui no <head>.
 (function injetarMetaPWA(){
   try{
-    var metas=[['theme-color','#2D6A4F'],['apple-mobile-web-app-status-bar-style','black-translucent'],['apple-mobile-web-app-title','Sistema']];
+    var metas=[['theme-color','#0f2a63'],['apple-mobile-web-app-status-bar-style','black-translucent'],['apple-mobile-web-app-title','Sistema']];
     metas.forEach(function(mt){
       if(document.querySelector('meta[name="'+mt[0]+'"]'))return;
       var m=document.createElement('meta'); m.setAttribute('name',mt[0]); m.setAttribute('content',mt[1]); document.head.appendChild(m);
