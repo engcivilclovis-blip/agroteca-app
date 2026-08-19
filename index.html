@@ -215,7 +215,7 @@ var CFG_SEED = {brand:"Agroteca", tagline:"Plataforma fundiária e documental", 
 var user=null, view="", edit=null, verId=null, editProj=null, verProjId=null, editAgro=null;
 var diagnosticos=[], usuarios=[], projetos=[], atendimentos=[], solicitacoes=[], perfis={}, cfg={};
 var classificados=[], prestadores=[], editClass=null, filtroClass="todos", filtroServ="todos";
-var carregando=false, informes=[], informeIdx=0, informeTimer=null, verArquivados=false;
+var carregando=false, informes=[], informeIdx=0, informeTimer=null, verArquivados=false, erroCarregar="";
 var anuncioIdx=0, anuncioTimer=null;
 var trabalhos=[], editParc=null, verParcId=null, DONO_FONE="", parcTab="lista", crmParceiroSel="";
 var compartilhamentos=[], solicitacoesDados=[], diretorio=[], editComp=null, editSolD=null, redeTab="comp";
@@ -265,6 +265,16 @@ function apiPost(action,extra){
   return fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body)})
     .then(function(r){return r.json();}).catch(function(){return {erro:'falha de rede'};});
 }
+// POST com timeout (aborta se travar) — usado no carregamento para nunca prender em "carregando…"
+function apiPostTimeout(action,extra,ms){
+  var ctrl=(typeof AbortController!=="undefined")?new AbortController():null;
+  var to=ctrl?setTimeout(function(){ try{ctrl.abort();}catch(e){} }, ms||20000):null;
+  var body=Object.assign({k:API_SECRET,token:TOKEN,action:action},extra||{});
+  return fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),signal:ctrl?ctrl.signal:undefined})
+    .then(function(r){return r.json();})
+    .then(function(j){ if(to)clearTimeout(to); return j; })
+    .catch(function(e){ if(to)clearTimeout(to); return {erro:(e&&e.name==='AbortError')?'tempo esgotado':'falha de rede'}; });
+}
 function apiListar(colecao){ return apiPost('listar',{colecao:colecao}).then(function(r){return (r&&r.dados)||[];}); }
 function apiSalvarDoc(colecao,doc){ return apiPost('salvar',{colecao:colecao,doc:doc}); }
 // upload de arquivo para o Drive (via backend) — devolve {nome,link}
@@ -290,9 +300,13 @@ function carregarCfg(){
     .then(function(c){ if(c&&!c.erro){ cfg.brand=c.brand||'Agroteca'; cfg.tagline=c.tagline||''; cfg.bloqueados=c.bloqueados||[]; } }).catch(function(){});
 }
 // carrega todas as coleções após o login numa ÚNICA chamada (rápido)
-function carregarDados(){
-  return apiPost('listarTudo',{}).then(function(r){
-    if(r && r.erro){ if(/sess|revog|inv]l|inv.lid/i.test(r.erro)){ limparSessao(); user=null; TOKEN=""; render(); } return; }
+function carregarDados(){ return carregarComRetry_(3); }
+function carregarComRetry_(tentativas){
+  return apiPostTimeout('listarTudo',{},20000).then(function(r){
+    if(r && r.erro){
+      if(/sess|revog|inv]l|inv.lid/i.test(r.erro)){ limparSessao(); user=null; TOKEN=""; erroCarregar=""; render(); return; }
+      throw new Error(r.erro);
+    }
     var d=(r&&r.dados)||{};
     diagnosticos=d.diagnosticos||[]; projetos=d.projetos||[]; atendimentos=d.atendimentos||[];
     solicitacoes=d.solicitacoes||[]; classificados=d.classificados||[]; prestadores=d.prestadores||[]; trabalhos=d.trabalhos||[];
@@ -300,9 +314,13 @@ function carregarDados(){
     perfis={}; (d.perfis||[]).forEach(function(p){ perfis[p._chave||p.id||'']=p; });
     informes=d.informes||[];
     if(d.usuarios) usuarios=d.usuarios;
+    erroCarregar="";
+  }).catch(function(e){
+    if(tentativas>1){ return new Promise(function(res){ setTimeout(res,1500); }).then(function(){ return carregarComRetry_(tentativas-1); }); }
+    erroCarregar=(e&&e.message)||"falha ao carregar";
   });
 }
-function recarregarDados(){ carregando=true; render(); carregarDados().then(function(){ carregando=false; render(); }); }
+function recarregarDados(){ erroCarregar=""; carregando=true; render(); carregarDados().then(function(){ carregando=false; render(); }); }
 // savers por coleção (upsert de cada doc; coleções pequenas). Otimista: já atualizamos o array em memória.
 function salvarCfg(){ apiConfig('brand',cfg.brand||'Agroteca'); apiConfig('tagline',cfg.tagline||''); apiConfig('bloqueados',JSON.stringify(cfg.bloqueados||[])); }
 function salvarUsers(){ usuarios.forEach(function(u){ apiSalvarDoc('usuarios',u); }); }
@@ -407,6 +425,7 @@ function iniciarInformes(){
 function topbarHtml(){
   return '<div class="topbar"><span class="logo">'+(cfg.logo?'<img src="'+esc(cfg.logo)+'" style="height:30px;vertical-align:middle">':iconeTopoBranco())+' '+esc(cfg.brand||'AGROTECA').toUpperCase()+'</span>'+
     (carregando?'<span class="who" style="opacity:.8">· carregando…</span>':'')+
+    (erroCarregar?'<span class="who" style="color:#ffd7d7">· ⚠️ erro ao carregar <button class="btn ghost sm" onclick="recarregarDados()">↻ tentar de novo</button></span>':'')+
     '<span class="sp"></span><span class="who">'+esc(user.nome)+' · '+esc(PAPEIS[user.papel].nome)+'</span>'+
     '<button class="btn ghost sm" onclick="baixarMeuBackup()" title="Baixar uma cópia dos seus dados">💾 Backup</button>'+
     '<button class="btn ghost sm" onclick="abrirTrocaSenha()" title="Trocar seu PIN">🔑 Senha</button>'+
