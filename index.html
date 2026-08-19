@@ -253,6 +253,51 @@ function instalarApp(){
   alert('Para instalar:\n\n• No celular Android: toque no menu do navegador (⋮) e escolha "Instalar app" ou "Adicionar à tela inicial".\n• No computador: clique no ícone de instalar na barra de endereço (à direita).');
 }
 function fecharPwa(){ try{localStorage.setItem('pwa_dismiss','1');}catch(e){} var b=document.getElementById('pwaBanner'); if(b)b.remove(); }
+// ---- manifesto dinâmico: nome do app = marca configurada; ícone = logo (quadrado) ----
+function _roundRect(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function gerarIconeQuadrado(logoSrc, size, cb){
+  try{
+    var img=new Image();
+    img.onload=function(){
+      try{
+        var cv=document.createElement('canvas'); cv.width=size; cv.height=size; var ctx=cv.getContext('2d');
+        ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,size,size);                 // fundo branco (logo costuma ser sobre branco)
+        var max=size*0.80, r=Math.min(max/img.width, max/img.height); var w=img.width*r, h=img.height*r;
+        ctx.drawImage(img,(size-w)/2,(size-h)/2,w,h);
+        cb(cv.toDataURL('image/png'));
+      }catch(e){ cb(null); }
+    };
+    img.onerror=function(){ cb(null); };
+    img.src=logoSrc;
+  }catch(e){ cb(null); }
+}
+function _aplicarManifesto(nome, curto, icon512){
+  try{
+    var man={ name:nome, short_name:curto, start_url:'./', scope:'./', display:'standalone', orientation:'portrait',
+      background_color:'#ffffff', theme_color:'#2D6A4F',
+      icons: icon512 ? [
+        {src:icon512, sizes:'192x192', type:'image/png', purpose:'any'},
+        {src:icon512, sizes:'512x512', type:'image/png', purpose:'any'},
+        {src:icon512, sizes:'512x512', type:'image/png', purpose:'maskable'}
+      ] : [
+        {src:'icon-192.png', sizes:'192x192', type:'image/png'},
+        {src:'icon-512.png', sizes:'512x512', type:'image/png'}
+      ]
+    };
+    var url=URL.createObjectURL(new Blob([JSON.stringify(man)],{type:'application/manifest+json'}));
+    var link=document.querySelector('link[rel="manifest"]'); if(!link){ link=document.createElement('link'); link.rel='manifest'; document.head.appendChild(link); }
+    link.setAttribute('href', url);
+    if(icon512){ var at=document.querySelector('link[rel="apple-touch-icon"]'); if(!at){ at=document.createElement('link'); at.rel='apple-touch-icon'; document.head.appendChild(at);} at.setAttribute('href', icon512); }
+  }catch(e){}
+}
+function montarPWADinamico(){
+  try{
+    var nome=(cfg.brand||'Sistema');
+    var curto=nome.length>16 ? (nome.split(/[-–—]/)[0].trim().slice(0,16) || nome.slice(0,16)) : nome;
+    if(cfg.logo){ gerarIconeQuadrado(cfg.logo, 512, function(icon){ _aplicarManifesto(nome, curto, icon); }); }
+    else { _aplicarManifesto(nome, curto, null); }
+  }catch(e){}
+}
 function logAcesso(acao, doc){ try{ apiPost('log',{acao:acao, documento:doc}); }catch(e){} }
 function svv(id){ var el=document.getElementById(id); return el?el.value.trim():''; }
 
@@ -318,7 +363,7 @@ function apiConfig(chave,valor){ return apiPost('salvarConfig',{chave:chave,valo
 function carregarCfg(){
   // &t= quebra o cache do navegador; cache:'no-store' reforça (senão volta o logo antigo)
   return fetch(API_URL+'?action=config&k='+encodeURIComponent(API_SECRET)+'&t='+Date.now(), {cache:'no-store'}).then(function(r){return r.json();})
-    .then(function(c){ if(c&&!c.erro){ cfg.brand=c.brand||'Sistema'; cfg.tagline=c.tagline||''; cfg.bloqueados=c.bloqueados||[]; if(c.logo!==undefined) cfg.logo=c.logo||''; aplicarTituloGuia(); salvarMarcaCache(); render(); } }).catch(function(){});
+    .then(function(c){ if(c&&!c.erro){ cfg.brand=c.brand||'Sistema'; cfg.tagline=c.tagline||''; cfg.bloqueados=c.bloqueados||[]; if(c.logo!==undefined) cfg.logo=c.logo||''; aplicarTituloGuia(); salvarMarcaCache(); montarPWADinamico(); render(); } }).catch(function(){});
 }
 // título da guia do navegador = nome da marca
 function aplicarTituloGuia(){ try{ document.title=(cfg.brand||'Sistema')+(cfg.tagline?(' — '+cfg.tagline):''); }catch(e){} }
@@ -2820,6 +2865,7 @@ cfg={brand:"Sistema", tagline:"Gestão rural digital e integrada", bloqueados:[]
 carregarMarcaCache();   // marca/logo do cache aparecem já no 1º render (sem flash do nome)
 try{ var _c=new URLSearchParams(location.search).get('c'); if(_c) conviteToken=_c; }catch(e){}
 aplicarTituloGuia();
+try{ montarPWADinamico(); }catch(e){}
 render();
 carregarCfg().then(function(){
   var s=null; try{ s=JSON.parse(localStorage.getItem('agt_sess')||'null'); }catch(e){}
