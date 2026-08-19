@@ -586,8 +586,8 @@ function iconeMarca(px){
 function loginHtml(){
   var head=cfg.logo?('<img src="'+esc(cfg.logo)+'" alt="logo" style="max-height:76px;max-width:230px;vertical-align:middle">'):iconeMarca(66);
   return '<div class="login"><div style="text-align:center;margin-bottom:20px">'+head+
-    '<div style="margin-top:10px;font-weight:900;font-size:26px;color:var(--brand-dark);letter-spacing:.4px">'+esc(cfg.brand||'AGROTECA')+'</div>'+
-    '<div class="muted small">'+esc(cfg.tagline||'')+'</div></div>'+
+    '<div style="margin-top:12px;font-weight:900;font-size:clamp(17px,4.6vw,23px);line-height:1.15;color:var(--brand-dark);letter-spacing:.2px;text-wrap:balance;max-width:300px;margin-left:auto;margin-right:auto">'+esc(cfg.brand||'AGROTECA')+'</div>'+
+    '<div class="muted small" style="margin-top:6px">'+esc(cfg.tagline||'')+'</div></div>'+
     '<label class="f">PIN de acesso</label>'+
     '<input type="password" id="loginPin" placeholder="••••" inputmode="numeric" onkeydown="if(event.key===\'Enter\')entrar()">'+
     '<div style="height:14px"></div><button class="btn" id="btnEntrar" style="width:100%" onclick="entrar()">Entrar</button>'+
