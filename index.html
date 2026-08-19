@@ -1,6 +1,13 @@
 <!doctype html>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2D6A4F">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <title>Sistema de Gestão</title>
@@ -229,13 +236,21 @@ var MODELOS_COBRANCA=["Valor fixo","Por hectare","Por hora","Por visita","% sobr
 var fluxoLogin=null, TERMOS_VERSAO="1.0", logs=[];
 var TEXTO_TERMOS="TERMOS DE USO E POLÍTICA DE PRIVACIDADE (LGPD)\n\n1. O sistema é uma plataforma de gestão fundiária e documental que conecta produtores rurais, profissionais técnicos e organizações (cooperativas, cartórios, sindicatos).\n\n2. Ao aceitar, você autoriza o tratamento dos seus dados pessoais e dos documentos que inserir, exclusivamente para as finalidades de prestação dos serviços contratados, nos termos da Lei nº 13.709/2018 (LGPD).\n\n3. Compartilhamento: seus dados só são compartilhados com terceiros mediante a sua seleção e autorização expressa dentro do sistema; você pode revogar a qualquer momento.\n\n4. Segurança: o acesso é protegido por PIN e verificação por e-mail; os acessos a documentos críticos são registrados em trilha de auditoria.\n\n5. Direitos do titular: você pode solicitar acesso, correção ou exclusão dos seus dados a qualquer momento pelo próprio sistema ou pelo suporte.\n\n6. Este é um texto padrão inicial e poderá ser atualizado; a versão vigente é registrada com data e hora do seu aceite.";
 function ehMobile(){ return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent); }
+function ehIOS(){ try{ return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1); }catch(e){ return false; } }
+function jaInstalado(){ try{ return window.navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches); }catch(e){ return false; } }
 function bannerPwaHtml(){
-  if(!ehMobile()) return '';
+  if(jaInstalado()) return '';
   try{ if(localStorage.getItem('pwa_dismiss')==='1') return ''; }catch(e){}
-  if(window.navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches)) return '';
+  if(!ehMobile() && !deferredPrompt) return '';   // desktop só mostra se o navegador oferecer instalação
   return '<div id="pwaBanner" style="position:fixed;left:8px;right:8px;bottom:8px;z-index:9998;background:var(--brand-dark);color:#fff;border-radius:12px;padding:10px 12px;display:flex;gap:8px;align-items:center;box-shadow:0 4px 16px rgba(0,0,0,.3)">'+
-    '<div style="flex:1;font-size:13px">📲 Para uma melhor experiência, adicione o sistema à sua tela inicial.</div>'+
-    '<button class="btn sm" style="background:#fff;color:var(--brand-dark)" onclick="fecharPwa()">Ok</button></div>';
+    '<div style="flex:1;font-size:13px">📲 Instale o app na tela inicial — abre rápido e funciona como aplicativo.</div>'+
+    '<button class="btn sm" style="background:#fff;color:var(--brand-dark)" onclick="instalarApp()">Instalar</button>'+
+    '<button class="btn sm ghost" style="color:#fff" onclick="fecharPwa()">Agora não</button></div>';
+}
+function instalarApp(){
+  if(deferredPrompt){ deferredPrompt.prompt(); try{ deferredPrompt.userChoice.then(function(){ deferredPrompt=null; fecharPwa(); }); }catch(e){ deferredPrompt=null; } return; }
+  if(ehIOS()){ alert('Para instalar no iPhone/iPad:\n\n1) Toque no botão Compartilhar (o quadradinho com a seta para cima ↑, embaixo).\n2) Role e toque em "Adicionar à Tela de Início".\n3) Toque em "Adicionar".'); return; }
+  alert('Para instalar:\n\n• No celular Android: toque no menu do navegador (⋮) e escolha "Instalar app" ou "Adicionar à tela inicial".\n• No computador: clique no ícone de instalar na barra de endereço (à direita).');
 }
 function fecharPwa(){ try{localStorage.setItem('pwa_dismiss','1');}catch(e){} var b=document.getElementById('pwaBanner'); if(b)b.remove(); }
 function logAcesso(acao, doc){ try{ apiPost('log',{acao:acao, documento:doc}); }catch(e){} }
@@ -259,7 +274,12 @@ function foneWhats(f){ var d=String(f||"").replace(/\D/g,""); if(!d)return""; if
 /* ---- backend na nuvem (Apps Script) ---- */
 var API_URL="https://script.google.com/macros/s/AKfycbyBrWISjarAZZNQYtNK26FM8TdM3MXQNP9gNbzid5LpoClA267I1tdxngjk9gKya2azQA/exec";
 var API_SECRET="agt-87d2897c-6e2e";
+var APP_BASE="https://engcivilclovis-blip.github.io/rede-dados-tecnicos/"; // endereço do app p/ montar o link do convite
 var TOKEN="";
+var conviteToken=null, conviteNome="", convitePrecisaSenha=false; // fluxo do link mágico do produtor
+var deferredPrompt=null; // evento de instalação PWA (Android/desktop)
+try{ window.addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); deferredPrompt=e; var b=document.getElementById('pwaBanner'); if(!b) try{ renderMain&&renderMain(); }catch(_){}}); }catch(e){}
+try{ if('serviceWorker' in navigator){ window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); }); } }catch(e){}
 function apiPost(action,extra){
   var body=Object.assign({k:API_SECRET,token:TOKEN,action:action},extra||{});
   return fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body)})
@@ -400,6 +420,7 @@ function completude(d){ var r=0; DOCS.forEach(function(n){ if(d.docs[n]&&d.docs[
    ========================================================================= */
 function render(){
   var app=document.getElementById("app");
+  if(!user && conviteToken){ app.innerHTML=conviteHtml(); app.insertAdjacentHTML('beforeend',bannerPwaHtml()); return; }
   if(!user){ app.innerHTML=loginHtml(); app.insertAdjacentHTML('beforeend',bannerPwaHtml()); return; }
   if(user.pinVencido || trocaModo){ app.innerHTML=trocaSenhaHtml(); return; }
   if(fluxoLogin==='otp'){ app.innerHTML=otpHtml(); return; }
@@ -597,6 +618,56 @@ function loginHtml(){
     '<input type="password" id="loginPin" placeholder="••••" inputmode="numeric" onkeydown="if(event.key===\'Enter\')entrar()">'+
     '<div style="height:14px"></div><button class="btn" id="btnEntrar" style="width:100%" onclick="entrar()">Entrar</button>'+
     '<p class="muted small" style="text-align:center;margin-top:16px;opacity:.8">Acesso restrito · gestão rural integrada</p></div>';
+}
+/* ---- convite do produtor (link mágico, sem e-mail) ---- */
+function iniciarConvite(){
+  apiPost('resgatarConvite',{c:conviteToken}).then(function(r){
+    if(!r||r.erro){ conviteToken=null; alert((r&&r.erro)||'Convite inválido ou expirado.'); render(); return; }
+    conviteNome=r.nome||''; convitePrecisaSenha=!!r.precisaCriarSenha; render();
+  });
+}
+function conviteHtml(){
+  var head=cfg.logo?('<img src="'+esc(cfg.logo)+'" alt="logo" style="max-height:76px;max-width:230px;vertical-align:middle">'):iconeMarca(66);
+  var corpo;
+  if(!conviteNome){ corpo='<p class="muted small" style="text-align:center">Carregando seu acesso…</p>'; }
+  else if(convitePrecisaSenha){
+    corpo='<div style="font-size:18px;font-weight:800;margin:2px 0 6px;text-align:center">Olá, '+esc(conviteNome)+'! 👋</div>'+
+      '<p class="muted small">Crie uma senha de 4 dígitos para entrar. <b>Guarde bem</b> — é ela que você vai usar sempre.</p>'+
+      '<label class="f">Sua senha (4 dígitos)</label><input type="password" id="cvPin1" inputmode="numeric" maxlength="8" placeholder="••••">'+
+      '<label class="f" style="margin-top:8px">Repita a senha</label><input type="password" id="cvPin2" inputmode="numeric" maxlength="8" placeholder="••••" onkeydown="if(event.key===\'Enter\')criarSenhaConvite()">'+
+      '<div style="height:12px"></div><button class="btn" style="width:100%" onclick="criarSenhaConvite()">Criar senha e entrar</button>';
+  } else {
+    corpo='<div style="font-size:18px;font-weight:800;margin:2px 0 6px;text-align:center">Olá, '+esc(conviteNome)+'! 👋</div>'+
+      '<label class="f">Digite sua senha</label><input type="password" id="cvPin" inputmode="numeric" maxlength="8" placeholder="••••" onkeydown="if(event.key===\'Enter\')entrarConvite()">'+
+      '<div style="height:12px"></div><button class="btn" style="width:100%" onclick="entrarConvite()">Entrar</button>';
+  }
+  return '<div class="login"><div style="text-align:center;margin-bottom:16px">'+head+
+    '<div style="margin-top:10px;font-weight:900;font-size:clamp(16px,4.4vw,22px);line-height:1.15;color:var(--brand-dark);text-wrap:balance;max-width:300px;margin:8px auto 0">'+esc(cfg.brand||'Sistema')+'</div></div>'+corpo+
+    '<p class="muted small" style="text-align:center;margin-top:16px;opacity:.8">Bem-vindo, produtor 🌱</p></div>';
+}
+function _entrouConvite(r){
+  user=r.user; TOKEN=r.token; conviteToken=null; convitePrecisaSenha=false; conviteNome=""; fluxoLogin=null;
+  try{ history.replaceState(null,'',location.pathname); }catch(e){}
+  salvarSessao();
+  if(!user.termosAceitos){ fluxoLogin='termos'; render(); } else entrarApp();
+  setTimeout(function(){ try{ if(deferredPrompt||ehIOS()) instalarApp(); }catch(e){} }, 800);
+}
+function criarSenhaConvite(){
+  var a=svv('cvPin1'), b=svv('cvPin2');
+  if(!/^\d{4,8}$/.test(a)){ alert('A senha deve ter de 4 a 8 dígitos.'); return; }
+  if(a!==b){ alert('As duas senhas não conferem. Digite igual nos dois campos.'); return; }
+  apiPost('definirSenhaConvite',{c:conviteToken, pin:a}).then(function(r){
+    if(!r||r.erro){ alert((r&&r.erro)||'Falha ao criar a senha.'); return; }
+    _entrouConvite(r);
+  });
+}
+function entrarConvite(){
+  var p=svv('cvPin');
+  apiPost('loginConvite',{c:conviteToken, pin:p}).then(function(r){
+    if(!r||r.erro){ alert((r&&r.erro)||'Senha incorreta.'); return; }
+    if(r.precisaCriarSenha){ convitePrecisaSenha=true; conviteNome=r.nome||conviteNome; render(); return; }
+    _entrouConvite(r);
+  });
 }
 function entrar(){
   var el=document.getElementById("loginPin"); var pin=(el&&el.value||"").trim();
@@ -1018,10 +1089,31 @@ function projVerHtml(){
   h+='<div class="card"><h2>📝 Andamento</h2>'+
     (pode?('<textarea id="projMovTxt" placeholder="Escreva um andamento..."></textarea><div style="height:8px"></div><button class="btn sm" onclick="addMovProj(\''+p.id+'\')">➕ Lançar andamento</button><div style="height:10px"></div>'):'')+
     (movs.length?movs.map(function(m){return '<div class="mov"><div class="muted small">'+brDH(m.quando)+' · '+esc(m.quem||"")+'</div><div style="white-space:pre-wrap">'+esc(m.texto)+'</div></div>';}).join(""):'<div class="muted small">Sem andamentos ainda.</div>')+'</div>';
+  // Acesso do produtor (link mágico, sem e-mail)
+  if(pode){
+    h+='<div class="card"><h2>👨‍🌾 Acesso do produtor</h2>'+
+      '<p class="muted small">Gere um link para o produtor <b>entrar e instalar o app</b>. Ele abre o link, cria a própria senha de 4 dígitos e pronto — <b>sem e-mail</b>. Envie por WhatsApp.</p>'+
+      '<button class="btn" onclick="gerarAcessoProdutor(\''+p.id+'\')">🔑 Gerar acesso do produtor</button></div>';
+  }
   // Peças + gerar
   h+='<div class="card"><h2>Peças selecionadas</h2>'+(pecas.length?pecas.map(function(x){return '<span class="pill azul" style="margin:2px">'+esc(x)+'</span>';}).join(" "):'<span class="muted small">Nenhuma.</span>')+'</div>'+
     '<div class="card"><h2>Gerar</h2><div class="row"><button class="btn azul" onclick="gerarPecas(\''+p.id+'\')">⚙️ Gerar peças (servidor)</button><button class="btn sec" onclick="baixarProjeto(\''+p.id+'\')">⬇️ Salvar no PC</button></div></div>';
   return h;
+}
+function gerarAcessoProdutor(id){
+  var p=projById(id); if(!p)return;
+  var nome=prompt("Nome do produtor:", (p.imovel&&p.imovel.proprietario)||""); if(nome===null)return; nome=nome.trim(); if(!nome){ alert("Informe o nome do produtor."); return; }
+  var fone=prompt("WhatsApp do produtor (com DDD, só números):",""); if(fone===null)return; fone=(fone||"").replace(/\D/g,"");
+  apiPost('criarAcessoProdutor',{nome:nome, fone:fone, projetoId:id}).then(function(r){
+    if(!r||r.erro){ alert((r&&r.erro)||"Falha ao gerar o acesso."); return; }
+    var link=APP_BASE+"?c="+encodeURIComponent(r.token);
+    var msg="Olá "+r.nome+"! Você foi convidado para acessar o *"+(cfg.brand||"sistema")+"*.\n\n"+
+      "1) Abra este link no celular:\n"+link+"\n\n"+
+      "2) Crie sua senha de 4 números (guarde bem).\n\n"+
+      "3) O app mostra como instalar na tela do celular.\n\nQualquer dúvida, é só chamar.";
+    if(fone){ if(confirm("Acesso criado para "+r.nome+"!\n\nEnviar o convite por WhatsApp agora?")){ abrirWa2(fone, msg); } }
+    else { prompt("Acesso criado! Copie e envie este link para o produtor:", link); }
+  });
 }
 function addArqProj(id){ var p=projById(id); if(!p||!podeEditarProj(p))return; var nome=prompt("Nome do documento (ex.: Matrícula 6577):"); if(!nome)return; var link=prompt("Cole o LINK do arquivo (Drive/WhatsApp) — opcional:","")||""; if(!p.arquivos)p.arquivos=[]; p.arquivos.push({nome:nome,link:link,quem:user.nome,quando:new Date().toISOString()}); registrarMov(p,"Documento anexado: "+nome); apiSalvarDoc('projetos',p); render(); }
 function anexarArqProjFile(id,inp){
@@ -2692,15 +2784,18 @@ function salvarModulos(id){
 })();
 cfg={brand:"Sistema", tagline:"Gestão rural digital e integrada", bloqueados:[]};
 carregarMarcaCache();   // marca/logo do cache aparecem já no 1º render (sem flash do nome)
+try{ var _c=new URLSearchParams(location.search).get('c'); if(_c) conviteToken=_c; }catch(e){}
 aplicarTituloGuia();
 render();
 carregarCfg().then(function(){
   var s=null; try{ s=JSON.parse(localStorage.getItem('agt_sess')||'null'); }catch(e){}
   if(s && s.token && s.user){                 // login automático (sessão salva neste dispositivo)
+    conviteToken=null;
     user=s.user; TOKEN=s.token;
     if(user.pinTrocadoEm){ try{ var dias=Math.floor((Date.now()-new Date(String(user.pinTrocadoEm).slice(0,10)+'T00:00:00').getTime())/86400000); if(dias>=60) user.pinVencido=true; }catch(e){} }
     view=navFor(user)[0]||""; carregando=true; render();
     carregarDados().then(function(){ carregando=false; render(); });
-  } else { if(!user) render(); }
+  } else if(conviteToken){ iniciarConvite(); }   // link mágico do produtor
+  else { if(!user) render(); }
 });
 </script>
