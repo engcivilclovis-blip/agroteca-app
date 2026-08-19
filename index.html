@@ -575,9 +575,19 @@ function logoHtml(px){
   if(cfg.logo) return '<img src="'+esc(cfg.logo)+'" alt="logo" style="max-height:'+(px||48)+'px;max-width:220px;vertical-align:middle">';
   return logoAgrotecaSVG(px);
 }
+// ícone da marca (folha, sem texto) — colorido para fundo claro
+function iconeMarca(px){
+  var h=px||64;
+  return '<svg viewBox="0 0 100 100" height="'+h+'" style="vertical-align:middle" xmlns="http://www.w3.org/2000/svg">'+
+    '<path d="M 40 80 C 20 60, 20 30, 40 20 C 60 30, 70 50, 70 80 Z" fill="#2D6A4F"/>'+
+    '<circle cx="70" cy="50" r="15" fill="#0077B6" opacity="0.92"/>'+
+    '<path d="M 55 50 L 70 65 L 90 35" stroke="#FFFFFF" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+}
 function loginHtml(){
-  return '<div class="login"><div style="text-align:center;margin-bottom:20px">'+logoHtml(cfg.logo?64:72)+
-    (cfg.logo?'<div style="margin-top:8px;font-weight:800;font-size:20px;color:var(--brand-dark)">'+esc(cfg.brand)+'</div><div class="muted small">'+esc(cfg.tagline)+'</div>':'')+'</div>'+
+  var head=cfg.logo?('<img src="'+esc(cfg.logo)+'" alt="logo" style="max-height:76px;max-width:230px;vertical-align:middle">'):iconeMarca(66);
+  return '<div class="login"><div style="text-align:center;margin-bottom:20px">'+head+
+    '<div style="margin-top:10px;font-weight:900;font-size:26px;color:var(--brand-dark);letter-spacing:.4px">'+esc(cfg.brand||'AGROTECA')+'</div>'+
+    '<div class="muted small">'+esc(cfg.tagline||'')+'</div></div>'+
     '<label class="f">PIN de acesso</label>'+
     '<input type="password" id="loginPin" placeholder="••••" inputmode="numeric" onkeydown="if(event.key===\'Enter\')entrar()">'+
     '<div style="height:14px"></div><button class="btn" id="btnEntrar" style="width:100%" onclick="entrar()">Entrar</button>'+
