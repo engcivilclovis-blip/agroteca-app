@@ -316,8 +316,9 @@ function apiRemover(colecao,id){ return apiPost('remover',{colecao:colecao,id:id
 function apiConfig(chave,valor){ return apiPost('salvarConfig',{chave:chave,valor:valor}); }
 // carrega config pública (marca) p/ a tela de login
 function carregarCfg(){
-  return fetch(API_URL+'?action=config&k='+encodeURIComponent(API_SECRET)).then(function(r){return r.json();})
-    .then(function(c){ if(c&&!c.erro){ cfg.brand=c.brand||'Sistema'; cfg.tagline=c.tagline||''; cfg.bloqueados=c.bloqueados||[]; if(c.logo!==undefined) cfg.logo=c.logo||''; aplicarTituloGuia(); salvarMarcaCache(); } }).catch(function(){});
+  // &t= quebra o cache do navegador; cache:'no-store' reforça (senão volta o logo antigo)
+  return fetch(API_URL+'?action=config&k='+encodeURIComponent(API_SECRET)+'&t='+Date.now(), {cache:'no-store'}).then(function(r){return r.json();})
+    .then(function(c){ if(c&&!c.erro){ cfg.brand=c.brand||'Sistema'; cfg.tagline=c.tagline||''; cfg.bloqueados=c.bloqueados||[]; if(c.logo!==undefined) cfg.logo=c.logo||''; aplicarTituloGuia(); salvarMarcaCache(); render(); } }).catch(function(){});
 }
 // título da guia do navegador = nome da marca
 function aplicarTituloGuia(){ try{ document.title=(cfg.brand||'Sistema')+(cfg.tagline?(' — '+cfg.tagline):''); }catch(e){} }
@@ -2753,16 +2754,16 @@ function masterHtml(){
     precosCardHtml()+
     trilhaCardHtml();
 }
-function salvarMarca(){ cfg.brand=document.getElementById("cfgBrand").value.trim()||"Sistema"; cfg.tagline=document.getElementById("cfgTag").value.trim(); salvarCfg(); aplicarTituloGuia(); render(); }
+function salvarMarca(){ cfg.brand=document.getElementById("cfgBrand").value.trim()||"Sistema"; cfg.tagline=document.getElementById("cfgTag").value.trim(); salvarCfg(); aplicarTituloGuia(); salvarMarcaCache(); render(); }
 function subirLogo(){
   var f=document.getElementById("logoFile"); if(!f||!f.files||!f.files[0])return;
   var file=f.files[0];
-  if(file.size>500*1024){ if(!confirm("A imagem tem "+Math.round(file.size/1024)+"@sistema KB. Recomendado até ~200 KB. Continuar?"))return; }
+  if(file.size>500*1024){ if(!confirm("A imagem tem "+Math.round(file.size/1024)+" KB. Recomendado até ~200 KB. Continuar?"))return; }
   var rd=new FileReader();
-  rd.onload=function(){ cfg.logo=rd.result; apiConfig('logo',cfg.logo); renderMain(); alert("Logo atualizado."); };
+  rd.onload=function(){ cfg.logo=rd.result; apiConfig('logo',cfg.logo); salvarMarcaCache(); render(); alert("Logo atualizado. Já aparece no topo e no login."); };
   rd.readAsDataURL(file);
 }
-function removerLogo(){ cfg.logo=""; apiConfig('logo',''); renderMain(); }
+function removerLogo(){ cfg.logo=""; apiConfig('logo',''); salvarMarcaCache(); render(); }
 function addInforme(){
   var t=document.getElementById("infTitulo").value.trim(); if(!t){ alert("Informe o título."); return; }
   var it={id:uid(),titulo:t,link:document.getElementById("infLink").value.trim(),texto:document.getElementById("infTexto").value.trim()};
