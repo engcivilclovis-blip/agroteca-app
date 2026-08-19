@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<title>AGROTECA — Gestão Rural Digital e Integrada</title>
+<title>Sistema de Gestão</title>
 <style>
   :root{
     --bg:#eef3ef; --card:#ffffff; --ink:#212529; --muted:#5f6f68;
@@ -35,7 +35,7 @@
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px;box-shadow:0 2px 10px rgba(27,67,50,.06)}
   h1{font-size:20px;margin:0 0 2px;color:var(--brand-dark)}
   h2{font-size:15px;margin:0 0 10px;color:var(--brand)}
-  /* Cabeçalho de módulo (estilo banner AGROTECA) */
+  /* Cabeçalho de módulo (estilo banner) */
   .modbanner{background:linear-gradient(100deg,var(--brand-dark),var(--brand));border-radius:14px;padding:16px 20px;margin-bottom:16px;color:#fff;position:relative;overflow:hidden;box-shadow:0 6px 18px rgba(27,67,50,.20)}
   .modbanner::after{content:"";position:absolute;right:-40px;top:-60px;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.05)}
   .modbanner .mtag{display:inline-block;background:var(--tan);color:#3a2a10;font-size:10px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;padding:3px 10px;border-radius:6px;margin-bottom:8px}
@@ -105,7 +105,7 @@
 
 <script>
 /* =========================================================================
-   AGROTECA — protótipo (modo demo: localStorage)
+   Sistema — protótipo (modo demo: localStorage)
    Plataforma: Backoffice (diagnóstico+CRM) · Central do Produtor · Agrimensor.
    O nome/marca é configurável (painel Master) — trocável a qualquer momento.
    Backend Apps Script/Drive + geração técnica server-side entram depois.
@@ -209,7 +209,7 @@ var USERS_SEED = [
   {id:"u11",nome:"Parceiro Campo Demo",pin:"3030", papel:"campo",    ativo:true, fone:"49999990011"},
   {id:"u0",nome:"Você (Master)",     pin:"9999", papel:"master",     ativo:true},
 ];
-var CFG_SEED = {brand:"Agroteca", tagline:"Plataforma fundiária e documental", bloqueados:[]};
+var CFG_SEED = {brand:"Sistema", tagline:"Plataforma fundiária e documental", bloqueados:[]};
 
 /* ---- estado ---- */
 var user=null, view="", edit=null, verId=null, editProj=null, verProjId=null, editAgro=null;
@@ -227,14 +227,14 @@ var vinculos=[], comunicados=[], mensagensCoop=[], consentOrgSel=null, docsProd=
 var servicos=[], editServ=null;
 var MODELOS_COBRANCA=["Valor fixo","Por hectare","Por hora","Por visita","% sobre o valor","A combinar"];
 var fluxoLogin=null, TERMOS_VERSAO="1.0", logs=[];
-var TEXTO_TERMOS="TERMOS DE USO E POLÍTICA DE PRIVACIDADE (LGPD)\n\n1. O AGROTECA é uma plataforma de gestão fundiária e documental que conecta produtores rurais, profissionais técnicos e organizações (cooperativas, cartórios, sindicatos).\n\n2. Ao aceitar, você autoriza o tratamento dos seus dados pessoais e dos documentos que inserir, exclusivamente para as finalidades de prestação dos serviços contratados, nos termos da Lei nº 13.709/2018 (LGPD).\n\n3. Compartilhamento: seus dados só são compartilhados com terceiros mediante a sua seleção e autorização expressa dentro do sistema; você pode revogar a qualquer momento.\n\n4. Segurança: o acesso é protegido por PIN e verificação por e-mail; os acessos a documentos críticos são registrados em trilha de auditoria.\n\n5. Direitos do titular: você pode solicitar acesso, correção ou exclusão dos seus dados a qualquer momento pelo próprio sistema ou pelo suporte.\n\n6. Este é um texto padrão inicial e poderá ser atualizado; a versão vigente é registrada com data e hora do seu aceite.";
+var TEXTO_TERMOS="TERMOS DE USO E POLÍTICA DE PRIVACIDADE (LGPD)\n\n1. O sistema é uma plataforma de gestão fundiária e documental que conecta produtores rurais, profissionais técnicos e organizações (cooperativas, cartórios, sindicatos).\n\n2. Ao aceitar, você autoriza o tratamento dos seus dados pessoais e dos documentos que inserir, exclusivamente para as finalidades de prestação dos serviços contratados, nos termos da Lei nº 13.709/2018 (LGPD).\n\n3. Compartilhamento: seus dados só são compartilhados com terceiros mediante a sua seleção e autorização expressa dentro do sistema; você pode revogar a qualquer momento.\n\n4. Segurança: o acesso é protegido por PIN e verificação por e-mail; os acessos a documentos críticos são registrados em trilha de auditoria.\n\n5. Direitos do titular: você pode solicitar acesso, correção ou exclusão dos seus dados a qualquer momento pelo próprio sistema ou pelo suporte.\n\n6. Este é um texto padrão inicial e poderá ser atualizado; a versão vigente é registrada com data e hora do seu aceite.";
 function ehMobile(){ return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent); }
 function bannerPwaHtml(){
   if(!ehMobile()) return '';
   try{ if(localStorage.getItem('pwa_dismiss')==='1') return ''; }catch(e){}
   if(window.navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches)) return '';
   return '<div id="pwaBanner" style="position:fixed;left:8px;right:8px;bottom:8px;z-index:9998;background:var(--brand-dark);color:#fff;border-radius:12px;padding:10px 12px;display:flex;gap:8px;align-items:center;box-shadow:0 4px 16px rgba(0,0,0,.3)">'+
-    '<div style="flex:1;font-size:13px">📲 Para uma melhor experiência, adicione o Agroteca à sua tela inicial.</div>'+
+    '<div style="flex:1;font-size:13px">📲 Para uma melhor experiência, adicione o sistema à sua tela inicial.</div>'+
     '<button class="btn sm" style="background:#fff;color:var(--brand-dark)" onclick="fecharPwa()">Ok</button></div>';
 }
 function fecharPwa(){ try{localStorage.setItem('pwa_dismiss','1');}catch(e){} var b=document.getElementById('pwaBanner'); if(b)b.remove(); }
@@ -244,7 +244,7 @@ function svv(id){ var el=document.getElementById(id); return el?el.value.trim():
 /* ---- utils ---- */
 function uid(){ return "x"+Date.now().toString(36)+Math.floor(Math.random()*1000); }
 function hoje(){ return new Date().toISOString().slice(0,10); }
-function brData(iso){ if(!iso) return "—"; var p=String(iso).slice(0,10).split("-"); return p.length===3?p[2]+"/"+p[1]+"/"+p[0]:iso; }
+function brData(iso){ if(!iso) return "—"; var p=String(iso).slice(0,10).split("-"); return p.length===3?p[2]+"@sistema/"+p[1]+"@sistema/"+p[0]:iso; }
 function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
 function q(s){ return String(s==null?"":s).replace(/'/g,"\\'"); }
 function num(v){ v=String(v==null?"":v).replace(/[^\d.,-]/g,"").replace(/\./g,"").replace(",","."); var n=parseFloat(v); return isNaN(n)?null:n; }
@@ -297,11 +297,11 @@ function apiConfig(chave,valor){ return apiPost('salvarConfig',{chave:chave,valo
 // carrega config pública (marca) p/ a tela de login
 function carregarCfg(){
   return fetch(API_URL+'?action=config&k='+encodeURIComponent(API_SECRET)).then(function(r){return r.json();})
-    .then(function(c){ if(c&&!c.erro){ cfg.brand=c.brand||'Agroteca'; cfg.tagline=c.tagline||''; cfg.bloqueados=c.bloqueados||[]; if(c.logo!==undefined) cfg.logo=c.logo||''; aplicarTituloGuia(); salvarMarcaCache(); } }).catch(function(){});
+    .then(function(c){ if(c&&!c.erro){ cfg.brand=c.brand||'Sistema'; cfg.tagline=c.tagline||''; cfg.bloqueados=c.bloqueados||[]; if(c.logo!==undefined) cfg.logo=c.logo||''; aplicarTituloGuia(); salvarMarcaCache(); } }).catch(function(){});
 }
 // título da guia do navegador = nome da marca
-function aplicarTituloGuia(){ try{ document.title=(cfg.brand||'AGROTECA')+(cfg.tagline?(' — '+cfg.tagline):''); }catch(e){} }
-// cache da marca (nome+slogan+logo) no aparelho — aparece na hora na próxima abertura, sem "flash" do AGROTECA
+function aplicarTituloGuia(){ try{ document.title=(cfg.brand||'Sistema')+(cfg.tagline?(' — '+cfg.tagline):''); }catch(e){} }
+// cache da marca (nome+slogan+logo) no aparelho — aparece na hora na próxima abertura, sem "flash" do nome
 function salvarMarcaCache(){ try{ localStorage.setItem('agt_marca', JSON.stringify({brand:cfg.brand||'', tagline:cfg.tagline||'', logo:cfg.logo||''})); }catch(e){} }
 function carregarMarcaCache(){ try{ var mc=JSON.parse(localStorage.getItem('agt_marca')||'null'); if(mc){ if(mc.brand)cfg.brand=mc.brand; if(mc.tagline!==undefined)cfg.tagline=mc.tagline; if(mc.logo!==undefined)cfg.logo=mc.logo; } }catch(e){} }
 // carrega todas as coleções após o login numa ÚNICA chamada (rápido)
@@ -327,7 +327,7 @@ function carregarComRetry_(tentativas){
 }
 function recarregarDados(){ erroCarregar=""; carregando=true; render(); carregarDados().then(function(){ carregando=false; render(); }); }
 // savers por coleção (upsert de cada doc; coleções pequenas). Otimista: já atualizamos o array em memória.
-function salvarCfg(){ apiConfig('brand',cfg.brand||'Agroteca'); apiConfig('tagline',cfg.tagline||''); apiConfig('bloqueados',JSON.stringify(cfg.bloqueados||[])); }
+function salvarCfg(){ apiConfig('brand',cfg.brand||'Sistema'); apiConfig('tagline',cfg.tagline||''); apiConfig('bloqueados',JSON.stringify(cfg.bloqueados||[])); }
 function salvarUsers(){ usuarios.forEach(function(u){ apiSalvarDoc('usuarios',u); }); }
 function salvarDiag(){ diagnosticos.forEach(function(d){ apiSalvarDoc('diagnosticos',d); }); }
 function salvarProj(){ projetos.forEach(function(p){ apiSalvarDoc('projetos',p); }); }
@@ -428,7 +428,7 @@ function iniciarInformes(){
   },5000);
 }
 function topbarHtml(){
-  return '<div class="topbar"><span class="logo">'+(cfg.logo?'<img src="'+esc(cfg.logo)+'" style="height:30px;vertical-align:middle">':iconeTopoBranco())+' '+esc(cfg.brand||'AGROTECA').toUpperCase()+'</span>'+
+  return '<div class="topbar"><span class="logo">'+(cfg.logo?'<img src="'+esc(cfg.logo)+'" style="height:30px;vertical-align:middle">':iconeTopoBranco())+' '+esc(cfg.brand||'Sistema').toUpperCase()+'</span>'+
     (carregando?'<span class="who" style="opacity:.8">· carregando…</span>':'')+
     (erroCarregar?'<span class="who" style="color:#ffd7d7">· ⚠️ erro ao carregar <button class="btn ghost sm" onclick="recarregarDados()">↻ tentar de novo</button></span>':'')+
     '<span class="sp"></span><span class="who">'+esc(user.nome)+' · '+esc(PAPEIS[user.papel].nome)+'</span>'+
@@ -558,16 +558,16 @@ function renderMain(){
 }
 
 /* ---- login ---- */
-// Logo AGROTECA (SVG vetorial) — colorido para fundo claro
-function logoAgrotecaSVG(px){
+// Logo padrão (SVG vetorial) — colorido para fundo claro
+function logoPadraoSVG(px){
   var h=px||48;
   return '<svg viewBox="0 0 400 120" height="'+h+'" style="vertical-align:middle;max-width:100%" xmlns="http://www.w3.org/2000/svg">'+
     '<path d="M 40 80 C 20 60, 20 30, 40 20 C 60 30, 70 50, 70 80 Z" fill="#2D6A4F"/>'+
     '<circle cx="70" cy="50" r="15" fill="#0077B6" opacity="0.92"/>'+
     '<path d="M 55 50 L 70 65 L 90 35" stroke="#FFFFFF" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'+
-    '<text x="105" y="70" font-family="Inter,sans-serif" font-weight="900" font-size="48" fill="#2D6A4F">AGRO</text>'+
-    '<text x="245" y="70" font-family="Inter,sans-serif" font-weight="900" font-size="48" fill="#0077B6">TECA</text>'+
-    '<text x="108" y="95" font-family="Inter,sans-serif" font-weight="500" font-size="14" fill="#212529" letter-spacing="1">GESTÃO RURAL DIGITAL E INTEGRADA</text></svg>';
+    '<text x="105" y="70" font-family="Inter,sans-serif" font-weight="900" font-size="48" fill="#2D6A4F">SIS</text>'+
+    '<text x="245" y="70" font-family="Inter,sans-serif" font-weight="900" font-size="48" fill="#0077B6">TEMA</text>'+
+    '<text x="108" y="95" font-family="Inter,sans-serif" font-weight="500" font-size="14" fill="#212529" letter-spacing="1">SISTEMA</text></svg>';
 }
 // Ícone só (branco) para o topbar sobre fundo verde
 function iconeTopoBranco(){
@@ -578,7 +578,7 @@ function iconeTopoBranco(){
 }
 function logoHtml(px){
   if(cfg.logo) return '<img src="'+esc(cfg.logo)+'" alt="logo" style="max-height:'+(px||48)+'px;max-width:220px;vertical-align:middle">';
-  return logoAgrotecaSVG(px);
+  return iconeMarca(px);
 }
 // ícone da marca (folha, sem texto) — colorido para fundo claro
 function iconeMarca(px){
@@ -591,7 +591,7 @@ function iconeMarca(px){
 function loginHtml(){
   var head=cfg.logo?('<img src="'+esc(cfg.logo)+'" alt="logo" style="max-height:76px;max-width:230px;vertical-align:middle">'):iconeMarca(66);
   return '<div class="login"><div style="text-align:center;margin-bottom:20px">'+head+
-    '<div style="margin-top:12px;font-weight:900;font-size:clamp(17px,4.6vw,23px);line-height:1.15;color:var(--brand-dark);letter-spacing:.2px;text-wrap:balance;max-width:300px;margin-left:auto;margin-right:auto">'+esc(cfg.brand||'AGROTECA')+'</div>'+
+    '<div style="margin-top:12px;font-weight:900;font-size:clamp(17px,4.6vw,23px);line-height:1.15;color:var(--brand-dark);letter-spacing:.2px;text-wrap:balance;max-width:300px;margin-left:auto;margin-right:auto">'+esc(cfg.brand||'Sistema')+'</div>'+
     '<div class="muted small" style="margin-top:6px">'+esc(cfg.tagline||'')+'</div></div>'+
     '<label class="f">PIN de acesso</label>'+
     '<input type="password" id="loginPin" placeholder="••••" inputmode="numeric" onkeydown="if(event.key===\'Enter\')entrar()">'+
@@ -735,7 +735,7 @@ function listaHtml(){
   var lista=diagnosticos.filter(function(d){return verArquivados? d.arquivado : !d.arquivado;}).sort(function(a,b){return (b.criadoEm||"").localeCompare(a.criadoEm||"");});
   var podeNovo=navFor(user).indexOf("novo")>-1;
   return '<div class="row" style="justify-content:space-between;margin-bottom:8px">'+
-      '<button class="btn sm '+(verArquivados?"":"sec")+'" onclick="toggleArquivados()">'+(verArquivados?"↩️ Ver ativos":"🗄️ Ver arquivados"+(arqCount?" ("+arqCount+")":""))+'</button>'+
+      '<button class="btn sm '+(verArquivados?"":"sec")+'" onclick="toggleArquivados()">'+(verArquivados?"↩️ Ver ativos":"🗄️ Ver arquivados"+(arqCount?" ("+arqCount+"@sistema)":""))+'</button>'+
       (podeNovo?'<button class="btn" onclick="irView(\'novo\')">➕ Novo diagnóstico</button>':'<span></span>')+'</div>'+
     (user.papel==="juridico"?'<div class="banner info">Você está no acesso <b>Jurídico</b>: pode consultar e registrar observações jurídicas.</div>':'')+
     (lista.length? lista.map(itemLista).join(""):'<div class="card muted">'+(verArquivados?"Nenhum diagnóstico arquivado.":"Nenhum diagnóstico ativo.")+'</div>');
@@ -769,7 +769,7 @@ function setServico(id){ edit.servico=id; renderMain(); }
 function setStatus(s){ edit.status=s; }
 function togglePonto(p){ var i=edit.pontos.indexOf(p); if(i>-1)edit.pontos.splice(i,1); else edit.pontos.push(p); }
 function toggleOport(o){ var i=edit.oportunidades.indexOf(o); if(i>-1)edit.oportunidades.splice(i,1); else edit.oportunidades.push(o); }
-function anexar(){ var f=document.getElementById("fileInput"); if(!f||!f.files)return; for(var i=0;i<f.files.length;i++)edit.arquivos.push({nome:f.files[i].name,tamanho:Math.round(f.files[i].size/1024)+" KB"}); renderMain(); }
+function anexar(){ var f=document.getElementById("fileInput"); if(!f||!f.files)return; for(var i=0;i<f.files.length;i++)edit.arquivos.push({nome:f.files[i].name,tamanho:Math.round(f.files[i].size/1024)+"@sistema KB"}); renderMain(); }
 function removerArq(i){ edit.arquivos.splice(i,1); renderMain(); }
 function formHtml(){
   var d=edit, div=divergenciaAreas(d), f=flagMatricula(d), c=completude(d), fin=podeVerFinanceiro();
@@ -823,8 +823,8 @@ function whatsCliente(id){
   var d=diagnosticos.find(function(x){return x.id===id;})||edit; var w=foneWhats(d.cliente.fone);
   if(!w){ alert("Cliente sem telefone."); return; }
   var link=d.pacoteLink||"(link dos documentos será gerado no Drive quando a nuvem estiver ativa)";
-  var msg="Olá "+(d.cliente.nome||"")+"! Aqui é da "+cfg.brand+". Seguem os documentos do imóvel "+(d.cliente.nomeImovel||"")+": "+link;
-  window.open("https://wa.me/"+w+"?text="+encodeURIComponent(msg),"_blank");
+  var msg="Olá "+(d.cliente.nome||"")+"@sistema! Aqui é da "+cfg.brand+"@sistema. Seguem os documentos do imóvel "+(d.cliente.nomeImovel||"")+"@sistema: "+link;
+  window.open("https://wa.me/"+w+"@sistema?text="+encodeURIComponent(msg),"_blank");
 }
 
 /* ---- fila / detalhe engenheiro ---- */
@@ -847,8 +847,8 @@ function verHtml(){
   return '<div class="row" style="justify-content:space-between"><h1>'+esc(d.cliente.nome)+(d.arquivado?' <span class="pill neutro">arquivado</span>':'')+'</h1><button class="btn sec" onclick="irView(\''+voltar+'\')">Voltar</button></div><div style="height:10px"></div>'+
     acoesDiagHtml(d)+
     (div?'<div class="banner erro">⚠️ Divergência de área sinalizada.</div>':'')+'<div class="banner '+f.cls+'">📄 '+f.txt+'</div>'+
-    '<div class="card"><h2>Resumo</h2>'+kv("Imóvel",d.cliente.nomeImovel)+kv("Município/UF",d.cliente.municipioUf)+kv("Área aprox.",d.cliente.areaHa+" ha")+
-      kv("Serviço",(SERVICOS.find(function(s){return s.id===d.servico;})||{}).nome)+kv("Status",d.status)+kv("Docs recebidos",c.rec+"/"+c.total)+
+    '<div class="card"><h2>Resumo</h2>'+kv("Imóvel",d.cliente.nomeImovel)+kv("Município/UF",d.cliente.municipioUf)+kv("Área aprox.",d.cliente.areaHa+"@sistema ha")+
+      kv("Serviço",(SERVICOS.find(function(s){return s.id===d.servico;})||{}).nome)+kv("Status",d.status)+kv("Docs recebidos",c.rec+"@sistema/"+c.total)+
       kv("CCIR",temDoc(d,"CCIR")?"sim":"não")+kv("CAR",temDoc(d,"CAR")?"sim":"não")+kv("ADA/IBAMA",temDoc(d,"ADA (IBAMA), se existente")?"sim":"não")+
       (fin?kv("Valor contratado","R$ "+(d.valor||"—")):"")+'</div>'+
     '<div class="card"><h2>Áreas (ha)</h2>'+kv("Matrícula",d.areas.matricula)+kv("CCIR",d.areas.ccir)+kv("CAR",d.areas.car)+kv("CAFIR/CIB",d.areas.cafir)+kv("SIGEF",d.areas.sigef)+'</div>'+
@@ -879,7 +879,7 @@ function arquivarDiag(id){ var d=diagnosticos.find(function(x){return x.id===id;
 function excluirDiag(id){ if(!ehMaster()){alert("Só o Master pode excluir.");return;} var d=diagnosticos.find(function(x){return x.id===id;}); if(!d)return; if(!confirm('Excluir o diagnóstico de "'+(d.cliente.nome||"")+'"?\n\nEle some das listas (nada é apagado de verdade — dá pra recuperar pelo backup).')) return; apiRemover("diagnosticos",id); diagnosticos=diagnosticos.filter(function(x){return x.id!==id;}); alert("Diagnóstico excluído."); view=voltarPadrao_(); render(); }
 function baixarJsonObj(obj,prefixo,nome){
   var b=new Blob([JSON.stringify(obj,null,2)],{type:"application/json"}); var a=document.createElement("a"); a.href=URL.createObjectURL(b);
-  a.download=prefixo+"_"+String(nome||"imovel").replace(/[^a-z0-9]+/gi,"_")+".json"; a.click();
+  a.download=prefixo+"@sistema_"+String(nome||"imovel").replace(/[^a-z0-9]+/gi,"_")+"@sistema.json"; a.click();
 }
 function exportarJson(id){ var d=diagnosticos.find(function(x){return x.id===id;}); if(!d)return; baixarJsonObj(d,"diagnostico",d.cliente.nome); }
 function baixarDiag(){ if(!edit)return; baixarJsonObj(edit,"diagnostico",edit.cliente&&edit.cliente.nome); }
@@ -887,7 +887,7 @@ function baixarMeuBackup(){
   var dump={ gerado:new Date().toISOString(), usuario:(user&&user.nome)||"", papel:(user&&user.papel)||"",
     diagnosticos:diagnosticos, projetos:projetos, atendimentos:atendimentos, solicitacoes:solicitacoes,
     classificados:classificados, prestadores:prestadores, perfis:perfis };
-  baixarJsonObj(dump,"agroteca_backup",((user&&user.nome)||"usuario")+"_"+new Date().toISOString().slice(0,10));
+  baixarJsonObj(dump,"backup_dados",((user&&user.nome)||"usuario")+"@sistema_"+new Date().toISOString().slice(0,10));
   alert("Backup baixado. Guarde numa pasta segura do seu PC.\n\n(Os dados também ficam salvos na nuvem/Google Drive automaticamente.)");
 }
 function marcarImportado(id){ var d=diagnosticos.find(function(x){return x.id===id;}); if(!d)return; d.importadoEm=new Date().toISOString(); if(!/conclu/i.test(d.status))d.status="Em análise técnica"; registrarMov(d,"Importado no sistema técnico"); salvarDiag(); render(); }
@@ -968,7 +968,7 @@ function editarProvidencia(id,pid){
   var hr=prompt("Hora (HH:MM) — opcional:",pr.hora||""); if(hr===null)return;
   var rs=prompt("Responsável — opcional:",pr.responsavel||""); if(rs===null)return;
   pr.texto=tx; pr.data=(dt||"").trim(); pr.hora=(hr||"").trim(); pr.responsavel=(rs||"").trim();
-  registrarMov(p,"Providência editada: "+tx+(pr.data?(" ("+brData(pr.data)+(pr.hora?(" "+pr.hora):"")+")"):""));
+  registrarMov(p,"Providência editada: "+tx+(pr.data?(" ("+brData(pr.data)+(pr.hora?(" "+pr.hora):"")+"@sistema)"):""));
   apiSalvarDoc('projetos',p); render();
 }
 function projVerHtml(){
@@ -984,7 +984,7 @@ function projVerHtml(){
     '<span class="pill '+stCls+'">'+esc(p.status||"Aberto")+'</span>'+
     '<span class="muted small">📥 Entrada: '+(p.dataEntrada?brData(p.dataEntrada):"—")+'</span>'+
     '<span class="muted small">✅ Conclusão: '+(p.dataConclusao?brData(p.dataConclusao):"—")+'</span></div></div>';
-  h+='<div class="card"><h2>Imóvel</h2>'+kv("Proprietário",p.imovel.proprietario)+kv("Matrícula",p.imovel.matricula)+kv("Comarca",p.imovel.comarca)+kv("Cartório",p.imovel.cartorio)+kv("Município/UF",p.imovel.municipioUf)+kv("Área",p.imovel.area+" ha")+kv("Perímetro",p.imovel.perimetro+" m")+'</div>';
+  h+='<div class="card"><h2>Imóvel</h2>'+kv("Proprietário",p.imovel.proprietario)+kv("Matrícula",p.imovel.matricula)+kv("Comarca",p.imovel.comarca)+kv("Cartório",p.imovel.cartorio)+kv("Município/UF",p.imovel.municipioUf)+kv("Área",p.imovel.area+"@sistema ha")+kv("Perímetro",p.imovel.perimetro+"@sistema m")+'</div>';
   // Documentos
   h+='<div class="card"><h2>📎 Documentos ('+(p.arquivos||[]).length+')</h2>'+
     ((p.arquivos||[]).length?p.arquivos.map(function(a,i){
@@ -1060,7 +1060,7 @@ function addProvidencia(id){ var p=projById(id); if(!p||!podeEditarProj(p))retur
   var tx=((document.getElementById('projProvTxt')||{}).value||"").trim(); if(!tx){alert("Descreva a providência.");return;}
   var dt=(document.getElementById('projProvData')||{}).value||""; var hr=(document.getElementById('projProvHora')||{}).value||""; var rs=(document.getElementById('projProvResp')||{}).value||"";
   if(!p.providencias)p.providencias=[]; p.providencias.push({id:uid(),texto:tx,data:dt,hora:hr,responsavel:rs,feito:false,criadoPor:user.nome,criadoEm:new Date().toISOString()});
-  registrarMov(p,"Providência agendada: "+tx+(dt?(" para "+brData(dt)+(hr?(" "+hr):"")):"")+(rs?(" ["+rs+"]"):""));
+  registrarMov(p,"Providência agendada: "+tx+(dt?(" para "+brData(dt)+(hr?(" "+hr):"")):"")+(rs?(" ["+rs+"@sistema]"):""));
   apiSalvarDoc('projetos',p); render(); }
 function toggleProvidencia(id,pid){ var p=projById(id); if(!p||!podeEditarProj(p))return; var pr=(p.providencias||[]).find(function(x){return x.id===pid;}); if(!pr)return; pr.feito=!pr.feito; registrarMov(p,(pr.feito?"Providência concluída: ":"Providência reaberta: ")+pr.texto); apiSalvarDoc('projetos',p); render(); }
 function delProvidencia(id,pid){ var p=projById(id); if(!p||!podeEditarProj(p))return; if(!confirm("Remover esta providência?"))return; p.providencias=(p.providencias||[]).filter(function(x){return x.id!==pid;}); apiSalvarDoc('projetos',p); render(); }
@@ -1068,11 +1068,11 @@ function editarProj(id){ editProj=JSON.parse(JSON.stringify(projetos.find(functi
 function gerarPecas(id){
   var p=projetos.find(function(x){return x.id===id;})||editProj; var sel=Object.keys(p.pecas||{}).filter(function(k){return p.pecas[k];});
   if(!sel.length){ alert("Selecione ao menos uma peça para gerar."); return; }
-  alert("No sistema real, os dados vão ao SERVIDOR, que roda o motor técnico (código protegido) e devolve os PDFs:\n\n• "+sel.join("\n• ")+"\n\nAqui no demo é só a simulação do fluxo.");
+  alert("No sistema real, os dados vão ao SERVIDOR, que roda o motor técnico (código protegido) e devolve os PDFs:\n\n• "+sel.join("\n• ")+"@sistema\n\nAqui no demo é só a simulação do fluxo.");
 }
 function baixarProjeto(id){ var p=projetos.find(function(x){return x.id===id;})||editProj;
   var b=new Blob([JSON.stringify(p,null,2)],{type:"application/json"}); var a=document.createElement("a"); a.href=URL.createObjectURL(b);
-  a.download="projeto_"+((p.nome||p.imovel.denominacao||"imovel").replace(/[^a-z0-9]+/gi,"_"))+".json"; a.click(); }
+  a.download="projeto_"+((p.nome||p.imovel.denominacao||"imovel").replace(/[^a-z0-9]+/gi,"_"))+"@sistema.json"; a.click(); }
 
 /* =========================================================================
    MÓDULO PARCEIROS — fluxo de serviços com parceiros (técnico/corretor/advogado)
@@ -1111,8 +1111,8 @@ function setParcTab(t){ parcTab=t; renderMain(); }
 function statusBucket(st){ st=st||""; if(/conclu|entreg|aprov/i.test(st))return "Concluído"; if(/aguard/i.test(st))return "Aguardando"; if(/an[aá]lise|execu|andamento|parecer|process|retrabalho/i.test(st))return "Em andamento"; return "Aberto"; }
 function itensDoParceiro(nome){
   var out=[];
-  (trabalhos||[]).forEach(function(t){ if(eqNome(t.parceiro,nome)||(t.parceirosAtribuidos||[]).some(function(n){return eqNome(n,nome);})) out.push({tipo:'serviço',id:t.id,titulo:(t.titulo||(t.imovel&&t.imovel.denominacao)||'(serviço)'),status:t.status,sub:((t.imovel&&t.imovel.municipioUf)||t.cliente&&t.cliente.nome||''),onclick:"verParc('"+t.id+"')"}); });
-  (projetos||[]).forEach(function(p){ if(eqNome(p.dono,nome)||(p.parceirosAtribuidos||[]).some(function(n){return eqNome(n,nome);})) out.push({tipo:'projeto',id:p.id,titulo:(p.nome||(p.imovel&&p.imovel.denominacao)||'(projeto)'),status:p.status||'Aberto',sub:(p.tipo||''),onclick:"verProj('"+p.id+"')"}); });
+  (trabalhos||[]).forEach(function(t){ if(eqNome(t.parceiro,nome)||(t.parceirosAtribuidos||[]).some(function(n){return eqNome(n,nome);})) out.push({tipo:'serviço',id:t.id,titulo:(t.titulo||(t.imovel&&t.imovel.denominacao)||'(serviço)'),status:t.status,sub:((t.imovel&&t.imovel.municipioUf)||t.cliente&&t.cliente.nome||''),onclick:"verParc('"+t.id+"@sistema')"}); });
+  (projetos||[]).forEach(function(p){ if(eqNome(p.dono,nome)||(p.parceirosAtribuidos||[]).some(function(n){return eqNome(n,nome);})) out.push({tipo:'projeto',id:p.id,titulo:(p.nome||(p.imovel&&p.imovel.denominacao)||'(projeto)'),status:p.status||'Aberto',sub:(p.tipo||''),onclick:"verProj('"+p.id+"@sistema')"}); });
   return out;
 }
 function painelCrmHtml(){
@@ -1214,7 +1214,7 @@ function parcVerHtml(){
     '<select onchange="mudarStatusParc(\''+t.id+'\',this.value)" style="font-size:13px;padding:6px">'+PARC_STATUS.map(function(st){return '<option '+(t.status===st?"selected":"")+'>'+st+'</option>';}).join("")+'</select></div></div>';
   // dados
   h+='<div class="card"><h2>Parceiro & cliente</h2>'+kv("Parceiro",t.parceiro)+kv("WhatsApp do parceiro",t.parceiroFone)+kv("Cliente",t.cliente.nome)+kv("WhatsApp do cliente",t.cliente.fone)+'</div>';
-  h+='<div class="card"><h2>Imóvel</h2>'+kv("Denominação",t.imovel.denominacao)+kv("Matrícula",t.imovel.matricula)+kv("Município/UF",t.imovel.municipioUf)+kv("Área",t.imovel.area?(t.imovel.area+" ha"):"")+(t.tipo==="tecnico"?(kv("Comarca",t.imovel.comarca)+kv("Cartório",t.imovel.cartorio)):"")+'</div>';
+  h+='<div class="card"><h2>Imóvel</h2>'+kv("Denominação",t.imovel.denominacao)+kv("Matrícula",t.imovel.matricula)+kv("Município/UF",t.imovel.municipioUf)+kv("Área",t.imovel.area?(t.imovel.area+"@sistema ha"):"")+(t.tipo==="tecnico"?(kv("Comarca",t.imovel.comarca)+kv("Cartório",t.imovel.cartorio)):"")+'</div>';
   if(t.tipo==="tecnico"&&(t.servico||t.procedimentos)) h+='<div class="card"><h2>Serviço técnico</h2>'+kv("Serviço",t.servico)+kv("Área do levantamento",t.areaServ)+(t.procedimentos?'<div class="kv"><span>Procedimentos</span><span>'+esc(t.procedimentos)+'</span></div>':'')+'</div>';
   if(t.descricao) h+='<div class="card"><h2>Descrição</h2><p style="white-space:pre-wrap">'+esc(t.descricao)+'</p></div>';
   // anexos do parceiro
@@ -1239,7 +1239,7 @@ function parcVerHtml(){
 function mudarStatusParc(id,st){ var t=trabById(id); if(!t)return; if(t.status===st)return; t.status=st; registrarMov(t,"Status alterado para: "+st); salvarTrab(); render(); }
 function addMovParc(id){ var t=trabById(id); if(!t)return; var el=document.getElementById("movParcTxt"); var txt=el?el.value.trim():""; if(!txt){alert("Escreva o andamento.");return;}
   registrarMov(t,txt); salvarTrab(); render();
-  setTimeout(function(){ if(confirm("Avisar o "+(ehEscritorio()?"parceiro":"escritório")+" pelo WhatsApp?")){ ehEscritorio()?avisarParceiro(id):avisarDono(id); } },150); }
+  setTimeout(function(){ if(confirm("Avisar o "+(ehEscritorio()?"parceiro":"escritório")+"@sistema pelo WhatsApp?")){ ehEscritorio()?avisarParceiro(id):avisarDono(id); } },150); }
 function addEntregaParc(id){ var t=trabById(id); if(!t)return; var nome=prompt("Nome do trabalho pronto (ex.: Memorial descritivo.pdf):"); if(!nome)return;
   var link=prompt("Cole o LINK para download (Google Drive):","")||"";
   if(!t.entregas)t.entregas=[]; t.entregas.push({nome:nome,link:link,quando:new Date().toISOString(),quem:user.nome});
@@ -1248,12 +1248,12 @@ function addEntregaParc(id){ var t=trabById(id); if(!t)return; var nome=prompt("
 function removeEntregaParc(id,i){ var t=trabById(id); if(!t)return; t.entregas.splice(i,1); salvarTrab(); render(); }
 function msgAndamento(t){
   var last=(t.movimentos&&t.movimentos.length)?t.movimentos[t.movimentos.length-1].texto:t.status;
-  var m="*"+(cfg.brand||"AGROTECA")+"* — Andamento do serviço\n📋 "+(t.titulo||"(serviço)")+"\n📌 Status: "+t.status+"\n";
-  if(last)m+="📝 "+last+"\n";
-  if(t.entregas&&t.entregas.length){ var e=t.entregas[t.entregas.length-1]; m+="✅ Pronto p/ baixar: "+e.nome+(e.link?(" — "+e.link):"")+"\n"; }
+  var m="*"+(cfg.brand||"Sistema")+"@sistema* — Andamento do serviço\n📋 "+(t.titulo||"(serviço)")+"@sistema\n📌 Status: "+t.status+"@sistema\n";
+  if(last)m+="📝 "+last+"@sistema\n";
+  if(t.entregas&&t.entregas.length){ var e=t.entregas[t.entregas.length-1]; m+="✅ Pronto p/ baixar: "+e.nome+(e.link?(" — "+e.link):"")+"@sistema\n"; }
   return m;
 }
-function abrirWa(f,msg){ f=foneWhats(f); if(!f){alert("Sem telefone cadastrado.");return;} window.open("https://wa.me/"+f+"?text="+encodeURIComponent(msg),"_blank"); }
+function abrirWa(f,msg){ f=foneWhats(f); if(!f){alert("Sem telefone cadastrado.");return;} window.open("https://wa.me/"+f+"@sistema?text="+encodeURIComponent(msg),"_blank"); }
 function avisarDono(id){ var t=trabById(id); if(!t)return; var f=donoFone(); if(!f){alert("O escritório ainda não configurou o WhatsApp (peça ao gestor em ‘Meu WhatsApp p/ parceiros’).");return;} abrirWa(f,msgAndamento(t)); }
 function avisarParceiro(id){ var t=trabById(id); if(!t)return; abrirWa(t.parceiroFone,msgAndamento(t)); }
 function avisarCliente(id){ var t=trabById(id); if(!t)return; abrirWa(t.cliente&&t.cliente.fone,msgAndamento(t)); }
@@ -1263,14 +1263,14 @@ function parcExtrato(id){
   var ent=(t.entregas||[]).map(function(e){return '<li>'+esc(e.nome)+(e.link?(' — '+esc(e.link)):'')+' ('+esc(brData(e.quando))+')</li>';}).join("")||'<li>—</li>';
   var w=window.open("","_blank"); if(!w){alert("Permita pop-ups para gerar o extrato.");return;}
   w.document.write('<html><head><meta charset="utf-8"><title>Extrato — '+esc(t.titulo)+'</title><style>body{font-family:Arial,sans-serif;color:#1a1a1a;padding:24px;max-width:800px;margin:auto}h1{color:#1B4332;font-size:20px}h2{font-size:15px;color:#2D6A4F;border-bottom:1px solid #ccc;padding-bottom:4px;margin-top:22px}table{width:100%;border-collapse:collapse;font-size:13px}td,th{border:1px solid #ddd;padding:6px 8px;text-align:left;vertical-align:top}th{background:#f0f4f0}.kv{font-size:13px;margin:3px 0}.kv b{display:inline-block;min-width:150px;color:#555}.foot{margin-top:26px;font-size:11px;color:#888}</style></head><body>'+
-    '<h1>'+esc(cfg.brand||"AGROTECA")+' — Extrato de andamento</h1>'+
+    '<h1>'+esc(cfg.brand||"Sistema")+' — Extrato de andamento</h1>'+
     '<div class="kv"><b>Serviço:</b> '+esc(t.titulo||"—")+'</div><div class="kv"><b>Tipo:</b> '+esc(parcTipoLabel(t.tipo))+'</div>'+
     '<div class="kv"><b>Parceiro:</b> '+esc(t.parceiro||"—")+'</div><div class="kv"><b>Cliente:</b> '+esc(t.cliente.nome||"—")+'</div>'+
     '<div class="kv"><b>Imóvel:</b> '+esc(t.imovel.denominacao||"—")+' · matrícula '+esc(t.imovel.matricula||"—")+' · '+esc(t.imovel.municipioUf||"—")+'</div>'+
     '<div class="kv"><b>Status atual:</b> '+esc(t.status)+'</div><div class="kv"><b>Aberto em:</b> '+esc(brDH(t.criadoEm))+'</div>'+
     '<h2>Movimentações</h2><table><tr><th>Data/hora</th><th>Por</th><th>Andamento</th></tr>'+linhas+'</table>'+
     '<h2>Trabalhos entregues</h2><ul>'+ent+'</ul>'+
-    '<div class="foot">Emitido em '+esc(new Date().toLocaleString("pt-BR"))+' · '+esc(cfg.brand||"AGROTECA")+'</div>'+
+    '<div class="foot">Emitido em '+esc(new Date().toLocaleString("pt-BR"))+' · '+esc(cfg.brand||"Sistema")+'</div>'+
     '<script>window.onload=function(){setTimeout(function(){window.print();},300);}<\/script></body></html>');
   w.document.close();
 }
@@ -1292,7 +1292,7 @@ function papelNome(p){ return (PAPEIS[p]||{}).nome||p||"—"; }
 function compVigente(c){ if(c.revogado) return false; if(c.validadeTipo==="temporario" && c.validade && c.validade<hoje()) return false; return true; }
 function compById(id){ return compartilhamentos.find(function(x){return x.id===id;}); }
 function solDById(id){ return solicitacoesDados.find(function(x){return x.id===id;}); }
-function abrirWa2(f,msg){ f=foneWhats(f); if(!f){alert("Ator sem WhatsApp cadastrado no diretório.");return;} window.open("https://wa.me/"+f+"?text="+encodeURIComponent(msg),"_blank"); }
+function abrirWa2(f,msg){ f=foneWhats(f); if(!f){alert("Ator sem WhatsApp cadastrado no diretório.");return;} window.open("https://wa.me/"+f+"@sistema?text="+encodeURIComponent(msg),"_blank"); }
 
 /* ---- navegação interna (sub-abas) ---- */
 function setRedeTab(t){ redeTab=t; renderMain(); }
@@ -1377,7 +1377,7 @@ function revogarComp(id,val){ var c=compById(id); if(!c)return; c.revogado=val; 
 function renovarComp(id){ var c=compById(id); if(!c)return; var v=prompt("Nova data de validade (AAAA-MM-DD):",c.validade||dataMais(90)); if(!v)return; c.validade=v; c.validadeTipo="temporario"; c.revogado=false; registrarMov(c,"Prazo renovado até "+v); salvarComp(); renderMain(); }
 function excluirComp(id){ if(!ehMaster())return; if(!confirm("Excluir este pacote?"))return; apiRemover('compartilhamentos',id); var i=compartilhamentos.findIndex(function(x){return x.id===id;}); if(i>-1)compartilhamentos.splice(i,1); renderMain(); }
 function avisarComp(id,nome){ var c=compById(id); if(!c)return;
-  var msg="*"+(cfg.brand||"AGROTECA")+"* — Dados disponíveis\n📦 "+(c.titulo||"pacote")+"\n"+(c.cliente&&c.cliente.nome?("👤 Cliente: "+c.cliente.nome+"\n"):"")+"🔐 Acesse sua conta para baixar"+(c.validadeTipo==="temporario"&&c.validade?(" (até "+brData(c.validade)+")"):"")+".";
+  var msg="*"+(cfg.brand||"Sistema")+"@sistema* — Dados disponíveis\n📦 "+(c.titulo||"pacote")+"@sistema\n"+(c.cliente&&c.cliente.nome?("👤 Cliente: "+c.cliente.nome+"@sistema\n"):"")+"@sistema🔐 Acesse sua conta para baixar"+(c.validadeTipo==="temporario"&&c.validade?(" (até "+brData(c.validade)+"@sistema)"):"")+"@sistema.";
   abrirWa2(foneDir(nome),msg); }
 
 /* ===================== (2) SOLICITAÇÕES DE DADOS ===================== */
@@ -1439,7 +1439,7 @@ function responderSolD(id){ var s=solDById(id); if(!s)return;
 function recusarSolD(id){ var s=solDById(id); if(!s)return; if(!confirm("Recusar este pedido?"))return; s.status="Recusada"; registrarMov(s,"Recusada por "+user.nome); salvarSolD(); renderMain(); }
 function avisarSolD(id,quem){ var s=solDById(id); if(!s)return;
   var alvoNome = quem==="alvo"? s.alvo : s.solicitante;
-  var msg="*"+(cfg.brand||"AGROTECA")+"* — Solicitação de dados\n📄 "+s.tipoDado+(s.cliente&&s.cliente.nome?("\n👤 Cliente: "+s.cliente.nome):"")+"\n📌 Status: "+s.status+(s.resposta?("\n📝 "+s.resposta):"");
+  var msg="*"+(cfg.brand||"Sistema")+"@sistema* — Solicitação de dados\n📄 "+s.tipoDado+(s.cliente&&s.cliente.nome?("\n👤 Cliente: "+s.cliente.nome):"")+"@sistema\n📌 Status: "+s.status+(s.resposta?("\n📝 "+s.resposta):"");
   abrirWa2(foneDir(alvoNome),msg);
 }
 
@@ -1542,7 +1542,7 @@ function campoVerHtml(){
     (esc_?(o.arquivado?'<button class="btn sm sec" onclick="arquivarCampo(\''+o.id+'\',false)">Desarquivar</button>':'<button class="btn sm sec" onclick="arquivarCampo(\''+o.id+'\',true)">🗄️ Arquivar</button>'):'')+
     '</div>'+(o.retrabalhoCount?'<div class="muted small" style="margin-top:6px">Retornos de retrabalho: '+o.retrabalhoCount+'</div>':'')+'</div>';
   h+='<div class="card"><h2>Ordem</h2>'+kv("Parceiro de campo",o.campoParceiro)+kv("Data agendada",o.dataAgendada?brData(o.dataAgendada):"")+kv("Serviço",o.servico)+kv("Cliente",o.cliente.nome)+kv("WhatsApp cliente",o.cliente.fone)+'</div>';
-  h+='<div class="card"><h2>Imóvel</h2>'+kv("Denominação",o.imovel.denominacao)+kv("Matrícula",o.imovel.matricula)+kv("Município/UF",o.imovel.municipioUf)+kv("Área",o.imovel.area?(o.imovel.area+" ha"):"")+'</div>';
+  h+='<div class="card"><h2>Imóvel</h2>'+kv("Denominação",o.imovel.denominacao)+kv("Matrícula",o.imovel.matricula)+kv("Município/UF",o.imovel.municipioUf)+kv("Área",o.imovel.area?(o.imovel.area+"@sistema ha"):"")+'</div>';
   if(o.detalhes) h+='<div class="card"><h2>Detalhes</h2><p style="white-space:pre-wrap">'+esc(o.detalhes)+'</p></div>';
   // agenda
   h+='<div class="card"><h2>📅 Agenda</h2>'+(o.dataAgendada?('<div class="row" style="gap:8px;flex-wrap:wrap"><a class="btn sm" href="'+gcalLink(o)+'" target="_blank">Adicionar ao Google Agenda</a><button class="btn sm sec" onclick="baixarICS(\''+o.id+'\')">⬇️ Exportar .ics</button></div>'):'<div class="muted small">Sem data agendada.</div>')+'</div>';
@@ -1568,15 +1568,15 @@ function campoVerHtml(){
   return h;
 }
 function mudarStatusCampo(id,st){ var o=campoById(id); if(!o||o.status===st)return; o.status=st; registrarMov(o,"Status: "+st); salvarCampo(); render(); }
-function marcarRetrabalho(id){ var o=campoById(id); if(!o)return; var m=prompt("O que precisa refazer? (motivo do retrabalho)",""); if(m==null)return; o.status="Retrabalho"; o.retrabalhoCount=(o.retrabalhoCount||0)+1; registrarMov(o,"RETRABALHO ("+o.retrabalhoCount+"x): "+m); salvarCampo(); render(); setTimeout(function(){ if(confirm("Avisar o parceiro pelo WhatsApp?")) avisarCampo(id,'parceiro'); },150); }
+function marcarRetrabalho(id){ var o=campoById(id); if(!o)return; var m=prompt("O que precisa refazer? (motivo do retrabalho)",""); if(m==null)return; o.status="Retrabalho"; o.retrabalhoCount=(o.retrabalhoCount||0)+1; registrarMov(o,"RETRABALHO ("+o.retrabalhoCount+"@sistemax): "+m); salvarCampo(); render(); setTimeout(function(){ if(confirm("Avisar o parceiro pelo WhatsApp?")) avisarCampo(id,'parceiro'); },150); }
 function arquivarCampo(id,val){ var o=campoById(id); if(!o)return; o.arquivado=val; registrarMov(o,val?"Arquivada":"Desarquivada"); salvarCampo(); render(); }
-function addMovCampo(id){ var o=campoById(id); if(!o)return; var el=document.getElementById("movCampoTxt"); var t=el?el.value.trim():""; if(!t){alert("Escreva o andamento.");return;} registrarMov(o,t); salvarCampo(); render(); setTimeout(function(){ if(confirm("Avisar o "+(ehEscritorioCampo()?"parceiro":"escritório")+" pelo WhatsApp?")){ ehEscritorioCampo()?avisarCampo(id,'parceiro'):avisarCampo(id,'escritorio'); } },150); }
+function addMovCampo(id){ var o=campoById(id); if(!o)return; var el=document.getElementById("movCampoTxt"); var t=el?el.value.trim():""; if(!t){alert("Escreva o andamento.");return;} registrarMov(o,t); salvarCampo(); render(); setTimeout(function(){ if(confirm("Avisar o "+(ehEscritorioCampo()?"parceiro":"escritório")+"@sistema pelo WhatsApp?")){ ehEscritorioCampo()?avisarCampo(id,'parceiro'):avisarCampo(id,'escritorio'); } },150); }
 function addEntregaCampo(id){ var o=campoById(id); if(!o)return; var nome=prompt("Nome da entrega (ex.: Levantamento.dwg / Relatório.pdf):"); if(!nome)return; var link=prompt("Link de download (Drive):","")||""; if(!o.entregas)o.entregas=[]; o.entregas.push({nome:nome,link:link,quando:new Date().toISOString(),quem:user.nome}); registrarMov(o,"Entrega anexada: "+nome); if(o.status==="Em execução"||o.status==="Campo executado")o.status="Processando"; salvarCampo(); render(); setTimeout(function(){ if(confirm("Avisar o escritório que há entrega?")) avisarCampo(id,'escritorio'); },150); }
 function setValorCampo(id){ var o=campoById(id); if(!o)return; var el=document.getElementById("valCampoInp"); o.valorCampo=el?el.value:o.valorCampo; registrarMov(o,"Valor do campo informado: "+o.valorCampo); salvarCampo(); alert("Valor salvo (entra em Pagamentos a Terceiros na sincronização com seu gerenciador)."); render(); }
 function custosCardHtml(o){
   var total=(o.custos||[]).reduce(function(s,c){return s+(num(c.valor)||0);},0);
   var lista=(o.custos||[]).length?o.custos.map(function(c,i){
-    var det=c.tipo==="Deslocamento"?(((c.origem||c.destino)?(' · '+esc(c.origem||"?")+"→"+esc(c.destino||"?")):'')+(c.km?(' · '+esc(c.km)+' km'):'')):'';
+    var det=c.tipo==="Deslocamento"?(((c.origem||c.destino)?(' · '+esc(c.origem||"?")+"@sistema→"+esc(c.destino||"?")):'')+(c.km?(' · '+esc(c.km)+' km'):'')):'';
     return '<div class="kv"><span><b>'+esc(c.tipo)+'</b> '+esc(c.descricao||"")+det+' <span class="muted small">'+brData(c.data)+'</span></span><span>'+fmtBR(num(c.valor))+' <button class="btn sm sec" onclick="delCustoCampo(\''+o.id+'\','+i+')">✕</button></span></div>';
   }).join(""):'<div class="muted small">Nenhum custo lançado.</div>';
   var d=custoDraft, desl=(d.tipo==="Deslocamento");
@@ -1596,12 +1596,12 @@ function custosCardHtml(o){
 function setCustoDraft(k,v){ custoDraft[k]=v; }
 function addCustoCampo(id){ var o=campoById(id); if(!o)return; if(num(custoDraft.valor)==null && !(custoDraft.descricao||"").trim()){ alert("Informe o valor ou a descrição do custo."); return; }
   if(!o.custos)o.custos=[]; o.custos.push(Object.assign({quem:user.nome,quando:new Date().toISOString()},custoDraft));
-  registrarMov(o,"Custo lançado: "+custoDraft.tipo+" "+fmtBR(num(custoDraft.valor)));
+  registrarMov(o,"Custo lançado: "+custoDraft.tipo+"@sistema "+fmtBR(num(custoDraft.valor)));
   custoDraft={tipo:"Deslocamento",descricao:"",valor:"",data:hoje(),km:"",origem:"",destino:""};
   salvarCampo(); render(); }
 function delCustoCampo(id,i){ var o=campoById(id); if(!o)return; o.custos.splice(i,1); salvarCampo(); render(); }
 function avisarCampo(id,quem){ var o=campoById(id); if(!o)return;
-  var msg="*"+(cfg.brand||"AGROTECA")+"* — Serviço de campo\n📋 "+(o.cliente.nome||o.imovel.denominacao||"ordem")+"\n📌 Status: "+o.status+(o.dataAgendada?("\n📅 "+brData(o.dataAgendada)):"")+(o.servico?("\n🛠️ "+o.servico):"");
+  var msg="*"+(cfg.brand||"Sistema")+"@sistema* — Serviço de campo\n📋 "+(o.cliente.nome||o.imovel.denominacao||"ordem")+"@sistema\n📌 Status: "+o.status+(o.dataAgendada?("\n📅 "+brData(o.dataAgendada)):"")+(o.servico?("\n🛠️ "+o.servico):"");
   var fone = quem==="parceiro"? foneDir(o.campoParceiro) : (quem==="cliente"? (o.cliente&&o.cliente.fone) : donoFone());
   if(quem==="escritorio"&&!fone){ alert("O escritório ainda não configurou o WhatsApp (Parceiros → Meu WhatsApp).");return; }
   abrirWa2(fone,msg);
@@ -1619,7 +1619,7 @@ function eventosUnificados(){
     if(podeVerCampo(o)&&!o.arquivado&&o.dataAgendada){
       var nome=(o.cliente&&o.cliente.nome)||(o.imovel&&o.imovel.denominacao)||'Ordem';
       ev.push({data:o.dataAgendada, hora:o.horaAgendada||'', tipo:'campo', id:o.id, cls:campoCalCls(o.status), ico:'📋',
-        label:nome, sub:(o.servico||''), status:o.status, onclick:"verCampo('"+o.id+"')",
+        label:nome, sub:(o.servico||''), status:o.status, onclick:"verCampo('"+o.id+"@sistema')",
         title:nome+' · '+(o.servico||'')+' · '+o.status});
     }
   });
@@ -1627,7 +1627,7 @@ function eventosUnificados(){
     if(participanteC(c)&&c.status!=="Recusado"&&c.status!=="Cancelado"&&c.data){
       var t=c.titulo||convLabelC(c);
       ev.push({data:c.data, hora:c.hora||'', tipo:'comprom', id:c.id, cls:comCalCls(c.status), ico:'📆',
-        label:t, sub:(c.local||''), status:c.status, onclick:"verComprom('"+c.id+"')",
+        label:t, sub:(c.local||''), status:c.status, onclick:"verComprom('"+c.id+"@sistema')",
         title:t+' · '+c.status});
     }
   });
@@ -1638,7 +1638,7 @@ function eventosUnificados(){
       if(!pr.data)return;
       ev.push({data:pr.data, hora:pr.hora||'', tipo:'providencia', id:p.id, cls:(pr.feito?'ok':'az'), ico:'🗓️',
         label:(pr.texto||'Providência'), sub:(p.nome||(p.imovel&&p.imovel.denominacao)||''), status:(pr.feito?'concluída':'agendada'),
-        onclick:"verProj('"+p.id+"')", title:(pr.texto||'')+' · '+(p.nome||'')});
+        onclick:"verProj('"+p.id+"@sistema')", title:(pr.texto||'')+' · '+(p.nome||'')});
     });
   });
   return ev;
@@ -1681,14 +1681,14 @@ function campoAgendaHtml(){
 function gcalLink(o){
   var text=encodeURIComponent("Campo: "+(o.cliente.nome||o.imovel.denominacao||"Serviço"));
   var d=(o.dataAgendada||"").replace(/-/g,"");
-  var dates=d?("&dates="+d+"/"+d):"";
+  var dates=d?("&dates="+d+"@sistema/"+d):"";
   var det=encodeURIComponent((o.servico||"")+(o.detalhes?(" — "+o.detalhes):""));
   var loc=encodeURIComponent(o.imovel.municipioUf||"");
-  return "https://calendar.google.com/calendar/render?action=TEMPLATE&text="+text+dates+"&details="+det+"&location="+loc;
+  return "https://calendar.google.com/calendar/render?action=TEMPLATE&text="+text+dates+"@sistema&details="+det+"@sistema&location="+loc;
 }
 function baixarICS(id){ var o=campoById(id); if(!o)return; var d=(o.dataAgendada||"").replace(/-/g,""); if(!d){alert("Ordem sem data agendada.");return;}
-  var ics="BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//AGROTECA//Campo//PT\r\nBEGIN:VEVENT\r\nUID:campo-"+o.id+"@agroteca\r\nDTSTART;VALUE=DATE:"+d+"\r\nDTEND;VALUE=DATE:"+d+"\r\nSUMMARY:Campo: "+(o.cliente.nome||o.imovel.denominacao||"Servico")+"\r\nDESCRIPTION:"+((o.servico||"")+" "+(o.detalhes||"")).replace(/[\r\n]+/g," ")+"\r\nLOCATION:"+(o.imovel.municipioUf||"")+"\r\nEND:VEVENT\r\nEND:VCALENDAR";
-  var b=new Blob([ics],{type:"text/calendar"}); var a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download="campo_"+((o.cliente.nome||o.imovel.denominacao||"ordem").replace(/[^a-z0-9]+/gi,"_"))+".ics"; a.click(); }
+  var ics="BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Sistema//Campo//PT\r\nBEGIN:VEVENT\r\nUID:campo-"+o.id+"@sistema\r\nDTSTART;VALUE=DATE:"+d+"\r\nDTEND;VALUE=DATE:"+d+"\r\nSUMMARY:Campo: "+(o.cliente.nome||o.imovel.denominacao||"Servico")+"\r\nDESCRIPTION:"+((o.servico||"")+" "+(o.detalhes||"")).replace(/[\r\n]+/g," ")+"\r\nLOCATION:"+(o.imovel.municipioUf||"")+"\r\nEND:VEVENT\r\nEND:VCALENDAR";
+  var b=new Blob([ics],{type:"text/calendar"}); var a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download="campo_"+((o.cliente.nome||o.imovel.denominacao||"ordem").replace(/[^a-z0-9]+/gi,"_"))+"@sistema.ics"; a.click(); }
 
 /* =========================================================================
    VISTORIA DE AVALIAÇÃO (PTAM) — sub-aba do módulo Campo
@@ -1783,7 +1783,7 @@ function avalPesquisaHtml(a){
   else {
     h+='<div class="kv"><span>Elementos válidos</span><span>'+c.n+' (usados '+c.saneada.length+', removidos '+c.removidos.length+')</span></div>'+
        '<div class="kv"><span>Unitário médio saneado</span><span>'+fmtBR(c.unitM2)+'/m² · '+fmtBR(c.unitHa)+'/ha</span></div>'+
-       '<div class="kv"><span>Área do imóvel</span><span>'+(c.areaHa!=null?c.areaHa.toLocaleString("pt-BR")+" ha":"— (preencha área total m²)")+'</span></div>'+
+       '<div class="kv"><span>Área do imóvel</span><span>'+(c.areaHa!=null?c.areaHa.toLocaleString("pt-BR")+"@sistema ha":"— (preencha área total m²)")+'</span></div>'+
        '<div class="kv"><span><b>Valor de mercado sugerido</b></span><span><b>'+fmtBR(c.valorMercado)+'</b></span></div>'+
        '<div class="grid g2" style="margin-top:8px">'+inpAv("Fator de liquidez (ex.: 0,95)","calc.fatorLiquidez",a.calc.fatorLiquidez)+'<div class="kv"><span>Liquidez sugerida</span><span>'+fmtBR(c.valorLiquidez)+'</span></div></div>';
   }
@@ -1827,7 +1827,7 @@ function addFotoAval(camera){
   var inp=document.createElement("input"); inp.type="file"; inp.accept="image/*"; inp.multiple=true; if(camera)inp.setAttribute("capture","environment");
   inp.onchange=function(e){ var files=e.target.files; if(!files||!files.length)return;
     function push(coords){ Array.prototype.forEach.call(files,function(f){ var r=new FileReader(); r.onload=function(ev){
-        var gps=coords?(Number(coords.latitude).toFixed(6)+", "+Number(coords.longitude).toFixed(6)):"";
+        var gps=coords?(Number(coords.latitude).toFixed(6)+"@sistema, "+Number(coords.longitude).toFixed(6)):"";
         if(!editAval.fotos)editAval.fotos=[]; editAval.fotos.push({nome:f.name,dataURI:ev.target.result,legenda:"",gps:gps,quando:new Date().toISOString()}); renderMain();
       }; r.readAsDataURL(f); }); }
     if(camera&&navigator.geolocation){ navigator.geolocation.getCurrentPosition(function(p){push(p.coords);},function(){push(null);},{timeout:8000,enableHighAccuracy:true}); }
@@ -1864,7 +1864,7 @@ function baixarDocWord(nomeArq, interno){
   var full='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>'+esc(nomeArq)+'</title>'+
     '<style>@page{size:A4;margin:2cm} body{font-family:\'Times New Roman\',serif;font-size:12pt;color:#000;line-height:1.4} h1{font-size:14pt;text-align:center;margin:0 0 12pt} h2{font-size:12pt;margin:14pt 0 4pt} p{margin:4pt 0;text-align:justify} table{border-collapse:collapse;width:100%;margin:6pt 0} td,th{border:1px solid #000;padding:4px;font-size:10pt;vertical-align:top} .sig{margin-top:48pt;text-align:center} .muted{color:#333;font-size:10pt} img{max-width:100%;height:auto}</style></head><body>'+interno+'</body></html>';
   var blob=new Blob(['﻿'+full],{type:'application/msword'});
-  var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=nomeArq+".doc"; a.click();
+  var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=nomeArq+"@sistema.doc"; a.click();
 }
 function gerarLaudoWord(id){
   var a=avalById(id)||editAval; var c=calcAval(a);
@@ -1983,7 +1983,7 @@ function salvarCompromAcao(){
   if(!editComprom.convidado){ alert("Escolha com quem é o agendamento."); return; }
   if(!(editComprom.titulo||"").trim()){ alert("Informe o assunto."); return; }
   editComprom.propostoPor=user.nome; editComprom.status="Solicitado";
-  registrarMov(editComprom,"Agendamento solicitado por "+user.nome+" para "+brData(editComprom.data)+(editComprom.hora?(" "+editComprom.hora):""));
+  registrarMov(editComprom,"Agendamento solicitado por "+user.nome+"@sistema para "+brData(editComprom.data)+(editComprom.hora?(" "+editComprom.hora):""));
   compromissos.push(editComprom); salvarComprom(); var id=editComprom.id; editComprom=null;
   alert("Solicitação enviada."); view="compromissos"; comTab="lista"; render();
   setTimeout(function(){ if(confirm("Avisar o convidado pelo WhatsApp?")) avisarComprom(id); },150);
@@ -2004,8 +2004,8 @@ function compromVerHtml(){
   h+='<div class="card"><h2>Histórico</h2>'+((c.movimentos||[]).length?'<div class="timeline">'+c.movimentos.slice().reverse().map(function(m){return '<div class="tl-item"><div class="tl-when">'+brDH(m.quando)+' · <b>'+esc(m.quem)+'</b></div><div>'+esc(m.texto)+'</div></div>';}).join("")+'</div>':'<div class="muted small">—</div>')+'</div>';
   return h;
 }
-function aceitarComprom(id){ var c=comById(id); if(!c||!podeResponderC(c))return; c.status="Confirmado"; registrarMov(c,"Confirmado por "+user.nome+" para "+brData(c.data)+(c.hora?(" "+c.hora):"")); salvarComprom(); render(); setTimeout(function(){ if(confirm("Avisar o outro participante?")) avisarComprom(id); },150); }
-function sugerirDataComprom(id){ var c=comById(id); if(!c||!podeResponderC(c))return; var nd=prompt("Nova data sugerida (AAAA-MM-DD):",c.data); if(!nd)return; var nh=prompt("Hora (opcional, HH:MM):",c.hora||"")||""; c.data=nd; c.hora=nh; c.propostoPor=user.nome; c.status="Sugerida nova data"; registrarMov(c,"Nova data sugerida por "+user.nome+": "+brData(nd)+(nh?(" "+nh):"")); salvarComprom(); render(); setTimeout(function(){ if(confirm("Avisar o outro participante?")) avisarComprom(id); },150); }
+function aceitarComprom(id){ var c=comById(id); if(!c||!podeResponderC(c))return; c.status="Confirmado"; registrarMov(c,"Confirmado por "+user.nome+"@sistema para "+brData(c.data)+(c.hora?(" "+c.hora):"")); salvarComprom(); render(); setTimeout(function(){ if(confirm("Avisar o outro participante?")) avisarComprom(id); },150); }
+function sugerirDataComprom(id){ var c=comById(id); if(!c||!podeResponderC(c))return; var nd=prompt("Nova data sugerida (AAAA-MM-DD):",c.data); if(!nd)return; var nh=prompt("Hora (opcional, HH:MM):",c.hora||"")||""; c.data=nd; c.hora=nh; c.propostoPor=user.nome; c.status="Sugerida nova data"; registrarMov(c,"Nova data sugerida por "+user.nome+"@sistema: "+brData(nd)+(nh?(" "+nh):"")); salvarComprom(); render(); setTimeout(function(){ if(confirm("Avisar o outro participante?")) avisarComprom(id); },150); }
 function recusarComprom(id){ var c=comById(id); if(!c)return; if(!confirm("Recusar este agendamento?"))return; c.status="Recusado"; registrarMov(c,"Recusado por "+user.nome); salvarComprom(); render(); }
 function cancelarComprom(id){ var c=comById(id); if(!c)return; if(!confirm("Cancelar este agendamento?"))return; c.status="Cancelado"; registrarMov(c,"Cancelado por "+user.nome); salvarComprom(); render(); }
 function foneComprom(c, alvo){ // alvo: 'convidado' | 'solicitante'
@@ -2014,10 +2014,10 @@ function foneComprom(c, alvo){ // alvo: 'convidado' | 'solicitante'
 }
 function avisarComprom(id){ var c=comById(id); if(!c)return;
   var alvo = eqNome(c.solicitante,user.nome) ? 'convidado' : 'solicitante';
-  var msg="*"+(cfg.brand||"AGROTECA")+"* — Agendamento\n📆 "+(c.titulo||"")+"\n📅 "+brData(c.data)+(c.hora?(" "+c.hora):"")+(c.local?("\n📍 "+c.local):"")+"\n📌 "+c.status;
+  var msg="*"+(cfg.brand||"Sistema")+"@sistema* — Agendamento\n📆 "+(c.titulo||"")+"@sistema\n📅 "+brData(c.data)+(c.hora?(" "+c.hora):"")+(c.local?("\n📍 "+c.local):"")+"@sistema\n📌 "+c.status;
   abrirWa2(foneComprom(c,alvo), msg);
 }
-function gcalComprom(c){ var t=encodeURIComponent(c.titulo||"Agendamento"); var d=(c.data||"").replace(/-/g,""); var dates=d?("&dates="+d+"/"+d):""; var det=encodeURIComponent(c.descricao||""); var loc=encodeURIComponent(c.local||""); return "https://calendar.google.com/calendar/render?action=TEMPLATE&text="+t+dates+"&details="+det+"&location="+loc; }
+function gcalComprom(c){ var t=encodeURIComponent(c.titulo||"Agendamento"); var d=(c.data||"").replace(/-/g,""); var dates=d?("&dates="+d+"@sistema/"+d):""; var det=encodeURIComponent(c.descricao||""); var loc=encodeURIComponent(c.local||""); return "https://calendar.google.com/calendar/render?action=TEMPLATE&text="+t+dates+"@sistema&details="+det+"@sistema&location="+loc; }
 
 /* =========================================================================
    COMUNIDADE — cooperativas/sindicatos/associações ↔ produtores
@@ -2098,11 +2098,11 @@ function revogarConsent(id){ var v=vincById(id); if(!v)return; if(!confirm('Revo
 function verDadosCompart(id){
   var v=vincById(id); if(!v||!v.consent||!v.consent.aceito){ alert('Este produtor não compartilhou dados.'); return; }
   logAcesso('Visualizou dados do produtor', v.produtor);
-  var d=v.consent.dados||{}; var t="DADOS COMPARTILHADOS — "+v.produtor+"\nAutorizado em "+brDH(v.consent.quando)+"\n\n";
-  if(d.propriedade) t+="🏡 Propriedade: "+(d.propriedade.propriedade||"—")+" · "+(d.propriedade.municipioUf||"")+" · matr. "+(d.propriedade.matricula||"—")+" · "+(d.propriedade.area||"—")+" ha\n";
-  if(d.contato) t+="📞 Contato: "+(d.contato.nome||"")+" "+(d.contato.fone||"")+"\n";
-  if(d.diagnosticos) t+="📋 Diagnósticos: "+(d.diagnosticos.length?d.diagnosticos.map(function(x){return x.imovel+" ("+x.status+")";}).join("; "):"nenhum")+"\n";
-  if(d.documentos) t+="🗄️ Documentos: "+(d.documentos.length?d.documentos.join(", "):"nenhum")+"\n";
+  var d=v.consent.dados||{}; var t="DADOS COMPARTILHADOS — "+v.produtor+"@sistema\nAutorizado em "+brDH(v.consent.quando)+"@sistema\n\n";
+  if(d.propriedade) t+="🏡 Propriedade: "+(d.propriedade.propriedade||"—")+"@sistema · "+(d.propriedade.municipioUf||"")+"@sistema · matr. "+(d.propriedade.matricula||"—")+"@sistema · "+(d.propriedade.area||"—")+"@sistema ha\n";
+  if(d.contato) t+="📞 Contato: "+(d.contato.nome||"")+"@sistema "+(d.contato.fone||"")+"@sistema\n";
+  if(d.diagnosticos) t+="📋 Diagnósticos: "+(d.diagnosticos.length?d.diagnosticos.map(function(x){return x.imovel+"@sistema ("+x.status+"@sistema)";}).join("; "):"nenhum")+"@sistema\n";
+  if(d.documentos) t+="🗄️ Documentos: "+(d.documentos.length?d.documentos.join(", "):"nenhum")+"@sistema\n";
   t+="\n— Termo aceito: "+(v.consent.termo||"");
   alert(t);
 }
@@ -2158,7 +2158,7 @@ function enviarComunicado(){
 function excluirComunicado(id){ if(!confirm('Excluir este comunicado?'))return; apiRemover('comunicados',id); var i=comunicados.findIndex(function(x){return x.id===id;}); if(i>-1)comunicados.splice(i,1); renderMain(); }
 function responderMsgCoop(id){ var mm=msgCoopById(id); if(!mm)return; var r=prompt('Resposta ao produtor:',mm.resposta||''); if(r==null)return; mm.resposta=r; salvarMensagensCoop(); renderMain(); setTimeout(function(){ if(confirm('Avisar o produtor pelo WhatsApp?')) avisarProdutorWa(id); },150); }
 function statusPedidoCoop(id,st){ var mm=msgCoopById(id); if(!mm)return; mm.status=st; salvarMensagensCoop(); renderMain(); }
-function avisarProdutorWa(id){ var mm=msgCoopById(id); if(!mm)return; var msg="*"+(cfg.brand||"AGROTECA")+"* — "+(mm.tipo==='pedido'?'Pedido':'Mensagem')+"\n"+(mm.tipo==='pedido'?('🛒 '+mm.item+(mm.qtd?(' ('+mm.qtd+')'):'')):('✉️ '+(mm.texto||'')))+(mm.resposta?("\n📝 "+mm.resposta):"")+(mm.status?("\n📌 "+mm.status):""); abrirWa2(foneDir(mm.produtor), msg); }
+function avisarProdutorWa(id){ var mm=msgCoopById(id); if(!mm)return; var msg="*"+(cfg.brand||"Sistema")+"@sistema* — "+(mm.tipo==='pedido'?'Pedido':'Mensagem')+"@sistema\n"+(mm.tipo==='pedido'?('🛒 '+mm.item+(mm.qtd?(' ('+mm.qtd+')'):'')):('✉️ '+(mm.texto||'')))+(mm.resposta?("\n📝 "+mm.resposta):"")+(mm.status?("\n📌 "+mm.status):""); abrirWa2(foneDir(mm.produtor), msg); }
 
 /* =========================================================================
    DOCUMENTOS AO PRODUTOR — profissional técnico envia doc; produtor baixa
@@ -2234,19 +2234,19 @@ function enviarDocGeral(){
   if(!para){ alert('Escolha o destinatário.'); return; } if(!nome.trim()){ alert('Informe o nome do documento.'); return; }
   var d={id:uid(),criadoEm:new Date().toISOString(),de:user.nome,dePapel:user.papel,produtor:para,nome:nome.trim(),link:link.trim(),descricao:desc.trim(),noCofre:false,tipo:'envio'};
   docsProd.push(d); apiSalvarDoc('docsprod',d); logAcesso&&logAcesso('Enviou documento: '+nome,para); alert('Documento enviado a '+para+'.'); renderMain();
-  setTimeout(function(){ if(confirm('Avisar '+para+' pelo WhatsApp?')){ abrirWa2(foneDir(para), '*'+(cfg.brand||"AGROTECA")+'* — Documento enviado: '+nome+(link?('\n'+link):'')); } },150);
+  setTimeout(function(){ if(confirm('Avisar '+para+' pelo WhatsApp?')){ abrirWa2(foneDir(para), '*'+(cfg.brand||"Sistema")+'* — Documento enviado: '+nome+(link?('\n'+link):'')); } },150);
 }
 function solicitarDoc(){
   var para=(document.getElementById('dsPara')||{}).value||'', nome=(document.getElementById('dsNome')||{}).value||'', desc=(document.getElementById('dsDesc')||{}).value||'';
   if(!para){ alert('Escolha de quem solicitar.'); return; } if(!nome.trim()){ alert('Informe o documento pedido.'); return; }
   var d={id:uid(),criadoEm:new Date().toISOString(),de:user.nome,dePapel:user.papel,produtor:para,nome:nome.trim(),link:'',descricao:desc.trim(),noCofre:false,tipo:'solicitacao',atendida:false};
   docsProd.push(d); apiSalvarDoc('docsprod',d); alert('Solicitação enviada a '+para+'.'); renderMain();
-  setTimeout(function(){ if(confirm('Avisar '+para+' pelo WhatsApp?')){ abrirWa2(foneDir(para), '*'+(cfg.brand||"AGROTECA")+'* — Solicitação de documento: '+nome); } },150);
+  setTimeout(function(){ if(confirm('Avisar '+para+' pelo WhatsApp?')){ abrirWa2(foneDir(para), '*'+(cfg.brand||"Sistema")+'* — Solicitação de documento: '+nome); } },150);
 }
 function responderSolic(id){
   var d=docProdById(id); if(!d)return; var link=prompt('Cole o LINK do documento solicitado ("'+d.nome+'"):',''); if(link==null)return;
   d.link=(link||'').trim(); d.atendida=true; apiSalvarDoc('docsprod',d); alert('Solicitação respondida.'); renderMain();
-  setTimeout(function(){ if(confirm('Avisar '+d.de+' pelo WhatsApp?')){ abrirWa2(foneDir(d.de), '*'+(cfg.brand||"AGROTECA")+'* — Documento solicitado enviado: '+d.nome+(d.link?('\n'+d.link):'')); } },150);
+  setTimeout(function(){ if(confirm('Avisar '+d.de+' pelo WhatsApp?')){ abrirWa2(foneDir(d.de), '*'+(cfg.brand||"Sistema")+'* — Documento solicitado enviado: '+d.nome+(d.link?('\n'+d.link):'')); } },150);
 }
 function addDocCofre(id){ var d=docProdById(id); if(!d)return; d.noCofre=true; salvarDocsProd(); alert('Adicionado ao seu cofre (aba Meus documentos).'); renderMain(); }
 function tirarDocCofre(id){ var d=docProdById(id); if(!d)return; d.noCofre=false; salvarDocsProd(); renderMain(); }
@@ -2423,7 +2423,7 @@ function mudarSolic(id,st){ var s=solicitacoes.find(function(x){return x.id===id
    MARKETPLACE — Classificados (compra/venda) + Serviços (credenciados)
    Monetização: anúncio em destaque (pago) + credenciamento de prestadores.
    ========================================================================= */
-function whatsFone(fone,msg){ var w=foneWhats(fone); if(!w){alert("Sem telefone.");return;} window.open("https://wa.me/"+w+"?text="+encodeURIComponent(msg||""),"_blank"); }
+function whatsFone(fone,msg){ var w=foneWhats(fone); if(!w){alert("Sem telefone.");return;} window.open("https://wa.me/"+w+"@sistema?text="+encodeURIComponent(msg||""),"_blank"); }
 /* ---- Classificados ---- */
 /* ---- banner rotativo de anúncios em destaque (Portal) ---- */
 function anunciosDestaque(){ var d=classificados.filter(function(a){return a.destaque;}); if(!d.length) d=classificados.slice(); return d.sort(function(a,b){return (b.criadoEm||"").localeCompare(a.criadoEm||"");}).slice(0,8); }
@@ -2506,7 +2506,7 @@ function servicosHtml(){
     '<div style="height:8px"></div><button class="btn sm" onclick="addPrestador()">Adicionar</button></div>'):'';
   return filtros+'<div class="grid g2">'+cards+'</div><div style="height:12px"></div>'+addForm;
 }
-function solicitarDoPrestador(nome,cat){ solicitacoes.push({id:uid(),criadoEm:new Date().toISOString(),produtor:user.nome,tipo:"Serviço (prestador)",item:cat+" — "+nome,valor:"",status:"Nova",obs:""}); salvarSolic(); alert("Solicitação enviada para o escritório intermediar."); }
+function solicitarDoPrestador(nome,cat){ solicitacoes.push({id:uid(),criadoEm:new Date().toISOString(),produtor:user.nome,tipo:"Serviço (prestador)",item:cat+"@sistema — "+nome,valor:"",status:"Nova",obs:""}); salvarSolic(); alert("Solicitação enviada para o escritório intermediar."); }
 function addPrestador(){ var n=(document.getElementById("npNome")||{}).value; if(!n||!n.trim()){alert("Informe o nome.");return;}
   prestadores.push({id:uid(),nome:n.trim(),cat:document.getElementById("npCat").value,cidade:(document.getElementById("npCidade")||{}).value||"",fone:(document.getElementById("npFone")||{}).value||"",cred:true,destaque:false,desc:(document.getElementById("npDesc")||{}).value||""}); salvarPrest(); renderMain(); }
 function toggleCred(id){ var p=prestadores.find(function(x){return x.id===id;}); if(p){p.cred=!p.cred; salvarPrest(); renderMain();} }
@@ -2628,11 +2628,11 @@ function masterHtml(){
     precosCardHtml()+
     trilhaCardHtml();
 }
-function salvarMarca(){ cfg.brand=document.getElementById("cfgBrand").value.trim()||"Agroteca"; cfg.tagline=document.getElementById("cfgTag").value.trim(); salvarCfg(); aplicarTituloGuia(); render(); }
+function salvarMarca(){ cfg.brand=document.getElementById("cfgBrand").value.trim()||"Sistema"; cfg.tagline=document.getElementById("cfgTag").value.trim(); salvarCfg(); aplicarTituloGuia(); render(); }
 function subirLogo(){
   var f=document.getElementById("logoFile"); if(!f||!f.files||!f.files[0])return;
   var file=f.files[0];
-  if(file.size>500*1024){ if(!confirm("A imagem tem "+Math.round(file.size/1024)+" KB. Recomendado até ~200 KB. Continuar?"))return; }
+  if(file.size>500*1024){ if(!confirm("A imagem tem "+Math.round(file.size/1024)+"@sistema KB. Recomendado até ~200 KB. Continuar?"))return; }
   var rd=new FileReader();
   rd.onload=function(){ cfg.logo=rd.result; apiConfig('logo',cfg.logo); renderMain(); alert("Logo atualizado."); };
   rd.readAsDataURL(file);
@@ -2683,15 +2683,15 @@ function salvarModulos(id){
 // PWA: meta tags que o Apps Script NÃO permite via addMetaTag são injetadas aqui no <head>.
 (function injetarMetaPWA(){
   try{
-    var metas=[['theme-color','#2D6A4F'],['apple-mobile-web-app-status-bar-style','black-translucent'],['apple-mobile-web-app-title','Agroteca']];
+    var metas=[['theme-color','#2D6A4F'],['apple-mobile-web-app-status-bar-style','black-translucent'],['apple-mobile-web-app-title','Sistema']];
     metas.forEach(function(mt){
       if(document.querySelector('meta[name="'+mt[0]+'"]'))return;
       var m=document.createElement('meta'); m.setAttribute('name',mt[0]); m.setAttribute('content',mt[1]); document.head.appendChild(m);
     });
   }catch(e){}
 })();
-cfg={brand:"AGROTECA", tagline:"Gestão rural digital e integrada", bloqueados:[]};
-carregarMarcaCache();   // marca/logo do cache aparecem já no 1º render (sem flash do AGROTECA)
+cfg={brand:"Sistema", tagline:"Gestão rural digital e integrada", bloqueados:[]};
+carregarMarcaCache();   // marca/logo do cache aparecem já no 1º render (sem flash do nome)
 aplicarTituloGuia();
 render();
 carregarCfg().then(function(){
