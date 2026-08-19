@@ -515,6 +515,8 @@ var MODINFO={
 function renderMain(){
   var m=document.getElementById("main"); if(!m) return;
   var html="";
+  // guardião: telas restritas ao Master (defesa no cliente; o servidor também bloqueia os dados/ações)
+  if(view==="master" && !ehMaster()){ view=(navFor(user)[0]||"crm"); }
   if(view==="crm") html=crmHtml();
   else if(view==="diag") html=listaHtml();
   else if(view==="novo"){ if(!edit) edit=novoDiag(); html=formHtml(); }
@@ -817,7 +819,7 @@ function filaHtml(){
     (fila.length?fila.map(function(d){var c=completude(d);
       return '<div class="list-item" onclick="verDiag(\''+d.id+'\')"><div class="t"><b>'+esc(d.cliente.nome)+'</b> '+statusPill(d.status)+(d.importadoEm?' <span class="pill ok">importado</span>':'')+
       '<div>'+esc(d.cliente.nomeImovel||"—")+' · '+esc(d.cliente.municipioUf||"—")+' · encaminhado '+brData(d.encaminhadoEm)+'</div>'+
-      '<div class="small"><span class="tag">docs '+c.rec+'/'+c.total+'</span> '+(d.pontos.length?'<span class="tag">⚠ '+d.pontos.length+'</span>':'')+' '+(d.arquivos.length?'<span class="tag">📎 '+d.arquivos.length+'</span>':'')+'</div></div><span class="muted">›</span></div>';
+      '<div class="small"><span class="tag">docs '+c.rec+'/'+c.total+'</span> '+(d.pontos.length?'<span class="tag">⚠ '+d.pontos.length+'</span>':'')+' '+(d.arquivos.length?'<span class="tag">📎 '+d.arquivos.length+'</span>':'')+'</div></div>'+(ehMaster()?'<button class="btn sm sec" style="color:var(--erro);border-color:var(--erro)" onclick="event.stopPropagation();excluirDiag(\''+d.id+'\')">🗑️</button>':'')+'<span class="muted">›</span></div>';
     }).join(""):'<div class="card muted">Nenhum diagnóstico encaminhado.</div>');
 }
 function verDiag(id){ verId=id; view="ver"; render(); }
