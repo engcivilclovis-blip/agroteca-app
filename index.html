@@ -2256,7 +2256,7 @@ function avalFotosHtml(a){
     '<div class="row" style="gap:8px;flex-wrap:wrap;margin:10px 0"><button class="btn" onclick="addFotoAval(true)">📷 Bater foto (câmera)</button><button class="btn sec" onclick="addFotoAval(false)">📁 Escolher da pasta</button></div>';
   h+=(a.fotos||[]).length?('<div class="grid g2">'+a.fotos.map(function(f,i){
     return '<div class="card" style="margin:0"><div class="row" style="justify-content:space-between"><b>Foto '+(i+1)+'</b>'+(f.link?'<span class="muted small">☁️ na nuvem</span>':'')+'<button class="btn sm sec" onclick="delFotoAval('+i+')">✕</button></div>'+
-      ((f.dataURI||f.link)?'<img src="'+(f.dataURI||f.link)+'" style="width:100%;border-radius:8px;margin:6px 0">':'<div class="muted small" style="margin:6px 0">(imagem não está nesta sessão — re-adicione para gerar)</div>')+
+      (fotoThumb(f)?'<img src="'+fotoThumb(f)+'" style="width:100%;border-radius:8px;margin:6px 0" onerror="this.style.display=\'none\'">':'<div class="muted small" style="margin:6px 0">(imagem não está nesta sessão — re-adicione para gerar)</div>')+
       (f.gps?'<div class="muted small">📍 '+esc(f.gps)+'</div>':'')+
       '<label class="f" style="margin-top:6px">Legenda</label><input value="'+esc(f.legenda)+'" oninput="setFotoLeg('+i+',this.value)" placeholder="Ex.: Vista externa - Casa principal"></div>';
   }).join("")+'</div>'):'<div class="muted small">Nenhuma foto.</div>';
@@ -2293,11 +2293,17 @@ function dataURItoFile(uri,nome){ var p=String(uri).split(','); var mime=(p[0].m
   try{ return new File([u8],nome||'foto.jpg',{type:mime}); }catch(e){ var b=new Blob([u8],{type:mime}); b.name=nome||'foto.jpg'; return b; } }
 // upload silencioso ao Drive (sempre chama cb, mesmo em falha)
 function subirFotoDrive(file,cb){ if(!file||file.size>12*1024*1024){ cb(null); return; }
-  var rd=new FileReader(); rd.onload=function(){ apiPost('uploadArquivo',{nome:file.name,base64:String(rd.result),mime:file.type||'image/jpeg'}).then(function(r){ cb(r&&r.url?r.url:null); }).catch(function(){ cb(null); }); };
+  var rd=new FileReader(); rd.onload=function(){ apiPost('uploadArquivo',{nome:file.name,base64:String(rd.result),mime:file.type||'image/jpeg'}).then(function(r){ cb(r&&r.url?{url:r.url,id:r.id||''}:null); }).catch(function(){ cb(null); }); };
   rd.onerror=function(){ cb(null); }; rd.readAsDataURL(file); }
 // sobe as fotos ainda sem link (para o escritório enxergar as fotos do vistoriador)
 function subirFotosPendentes(fotos,cb){ var pend=(fotos||[]).filter(function(f){return f.dataURI&&!f.link;}); if(!pend.length){ cb(0); return; }
-  var i=0,ok=0; (function prox(){ if(i>=pend.length){ cb(ok); return; } var f=pend[i++]; subirFotoDrive(dataURItoFile(f.dataURI,f.nome||('foto'+i+'.jpg')),function(url){ if(url){ f.link=url; ok++; } prox(); }); })(); }
+  var i=0,ok=0; (function prox(){ if(i>=pend.length){ cb(ok); return; } var f=pend[i++]; subirFotoDrive(dataURItoFile(f.dataURI,f.nome||('foto'+i+'.jpg')),function(res){ if(res){ f.link=res.url; f.driveId=res.id; ok++; } prox(); }); })(); }
+// miniatura do Drive (exibição na tela; funciona por ser compartilhado "qualquer um com o link")
+function fotoThumb(f){ return f.dataURI || (f.driveId?('https://drive.google.com/thumbnail?id='+f.driveId+'&sz=w1200'):(f.link||'')); }
+// resolve a imagem p/ o Word: base64 do backend (offline) → miniatura (online) → link
+function fotoParaWordSrc(f,cb){ if(f.dataURI){ cb(f.dataURI); return; }
+  if(f.driveId){ apiPost('fileBase64',{id:f.driveId}).then(function(r){ if(r&&r.ok&&r.base64){ cb('data:'+(r.mime||'image/jpeg')+';base64,'+r.base64); } else { cb('https://drive.google.com/thumbnail?id='+f.driveId+'&sz=w1600'); } }).catch(function(){ cb('https://drive.google.com/thumbnail?id='+f.driveId+'&sz=w1600'); }); return; }
+  cb(f.link||''); }
 function salvarAvalAcao(silent){
   if(!(editAval.imovel.proprietario||editAval.solicitante||"").trim()){ alert("Informe ao menos o proprietário ou o solicitante."); return; }
   if(modoVist && editAval.status==="Em vistoria") editAval.status="Pesquisa de mercado";
@@ -2309,7 +2315,7 @@ function _persistirAval(silent, nPend, nOk){
   var i=avaliacoes.findIndex(function(x){return x.id===editAval.id;});
   if(i>-1)avaliacoes[i]=editAval; else avaliacoes.push(editAval);
   // nuvem: guarda metadados + LINK do Drive (não a imagem base64)
-  var doc=JSON.parse(JSON.stringify(editAval)); doc.fotos=(doc.fotos||[]).map(function(f){return {nome:f.nome,legenda:f.legenda,gps:f.gps,quando:f.quando,link:f.link||""};});
+  var doc=JSON.parse(JSON.stringify(editAval)); doc.fotos=(doc.fotos||[]).map(function(f){return {nome:f.nome,legenda:f.legenda,gps:f.gps,quando:f.quando,link:f.link||"",driveId:f.driveId||""};});
   apiSalvarDoc('avaliacoes',doc); editAval._novo=false;
   if(!silent){ var extra=nPend?(nOk===nPend?(' '+nOk+' foto(s) enviada(s) à nuvem.'):(' '+nOk+'/'+nPend+' foto(s) enviada(s) — as demais tente novamente.')):''; alert((modoVist?"Vistoria enviada ao escritório.":"Avaliação salva.")+extra); }
   else { alert("Status salvo."); }
@@ -4722,8 +4728,14 @@ function _laudoWord(a, croquiImg){
 }
 function gerarRelatorioFotoWord(id){
   var a=avalById(id)||editAval;
-  var comImg=(a.fotos||[]).filter(function(f){return f.dataURI||f.link;});
+  var comImg=(a.fotos||[]).filter(function(f){return f.dataURI||f.driveId||f.link;});
   if(!comImg.length){ alert("Adicione fotos (aba Fotos) antes de gerar o relatório."); return; }
+  var precisaBuscar=comImg.some(function(f){return !f.dataURI && f.driveId;});
+  if(precisaBuscar){ try{ var m=document.querySelector('.modbanner .mtit'); }catch(e){} }
+  var srcs=new Array(comImg.length), done=0;
+  comImg.forEach(function(f,idx){ fotoParaWordSrc(f,function(src){ srcs[idx]=src; if(++done===comImg.length) _relatorioFotoFinal(a,comImg,srcs); }); });
+}
+function _relatorioFotoFinal(a, comImg, srcs){
   var im=a.imovel||{};
   var h='<h1>RELATÓRIO FOTOGRÁFICO</h1>';
   h+='<table style="margin-bottom:8pt"><tr><td style="border:none;padding:2px"><b>Proprietário:</b> '+esc(im.proprietario||"—")+'</td><td style="border:none;padding:2px"><b>Matrícula:</b> '+esc(im.matricula||"—")+'</td></tr>'+
@@ -4731,7 +4743,7 @@ function gerarRelatorioFotoWord(id){
   comImg.forEach(function(f,i){
     h+='<div style="page-break-inside:avoid;text-align:center;margin:0 0 12pt">'+
        '<div style="font-weight:bold;font-size:10pt;margin-bottom:2pt">Foto '+(i+1)+'</div>'+
-       '<img src="'+(f.dataURI||f.link)+'" style="width:440px;max-width:100%;border:1px solid #000">'+
+       '<img src="'+(srcs[i]||'')+'" style="width:440px;max-width:100%;border:1px solid #000">'+
        '<div style="font-size:9pt;color:#333;margin-top:3pt">'+esc(f.legenda||"")+(f.gps?(' &nbsp;·&nbsp; 📍 '+esc(f.gps)):'')+'</div>'+
        '</div>';
     if((i+1)%2===0 && i<comImg.length-1) h+='<div style="page-break-after:always"></div>';
