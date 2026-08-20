@@ -2048,8 +2048,8 @@ function avalRessarcHtml(a){
   var rows=(R.itens||[]).map(function(it,i){ var q=num(it.qtd)||0, vu=num(it.valorUnit)||0, st=q*vu; tot+=st;
     return '<tr><td style="padding:3px"><input value="'+esc(it.desc)+'" oninput="setRess('+i+',\'desc\',this.value)" style="width:100%"></td>'+
       '<td style="padding:3px"><input value="'+esc(it.unidade)+'" oninput="setRess('+i+',\'unidade\',this.value)" style="width:64px"></td>'+
-      '<td style="padding:3px"><input value="'+esc(it.qtd)+'" oninput="setRess('+i+',\'qtd\',this.value)" style="width:80px;text-align:right"></td>'+
-      '<td style="padding:3px"><input value="'+esc(it.valorUnit)+'" oninput="setRess('+i+',\'valorUnit\',this.value)" style="width:110px;text-align:right"></td>'+
+      '<td style="padding:3px"><input value="'+esc(it.qtd)+'" oninput="setRess('+i+',\'qtd\',this.value)" onchange="renderMain()" style="width:80px;text-align:right"></td>'+
+      '<td style="padding:3px"><input value="'+esc(it.valorUnit)+'" oninput="setRess('+i+',\'valorUnit\',this.value)" onchange="renderMain()" style="width:110px;text-align:right"></td>'+
       '<td style="padding:3px;text-align:right;white-space:nowrap">'+fmtBR(st)+'</td>'+
       '<td style="padding:3px"><button class="btn sm sec" onclick="delRess('+i+')">✕</button></td></tr>'; }).join("");
   return '<div class="card"><h2>💰 Tabela de ressarcimento / indenização (editável)</h2>'+
@@ -2061,7 +2061,7 @@ function avalRessarcHtml(a){
     txtAv("Observações da tabela de ressarcimento","ressarcimento.obs",R.obs)+'</div>';
 }
 function addRess(){ if(!editAval.ressarcimento)editAval.ressarcimento={itens:[],obs:""}; editAval.ressarcimento.itens.push({desc:"",unidade:"un",qtd:"",valorUnit:""}); renderMain(); }
-function setRess(i,k,v){ editAval.ressarcimento.itens[i][k]=v; if(k==='qtd'||k==='valorUnit') renderMain(); }
+function setRess(i,k,v){ editAval.ressarcimento.itens[i][k]=v; }
 function delRess(i){ editAval.ressarcimento.itens.splice(i,1); renderMain(); }
 function seedRess(){ if(!editAval.ressarcimento)editAval.ressarcimento={itens:[],obs:""};
   [{desc:"Cerca de arame farpado (5 fios)",unidade:"m",qtd:"",valorUnit:""},
@@ -2101,8 +2101,8 @@ function avalPesquisaHtml(a){
         '<div class="grid g2">'+
         '<div><label class="f">Descrição / localização</label><input value="'+esc(e.descricao)+'" oninput="setAmostra('+i+',\'descricao\',this.value)"></div>'+
         '<div><label class="f">Fonte</label><input value="'+esc(e.fonte)+'" oninput="setAmostra('+i+',\'fonte\',this.value)"></div>'+
-        '<div><label class="f">Área (m²)</label><input value="'+esc(e.areaM2)+'" oninput="setAmostra('+i+',\'areaM2\',this.value)"></div>'+
-        '<div><label class="f">Valor (R$)</label><input value="'+esc(e.valor)+'" oninput="setAmostra('+i+',\'valor\',this.value)"></div>'+
+        '<div><label class="f">Área (m²)</label><input value="'+esc(e.areaM2)+'" oninput="setAmostra('+i+',\'areaM2\',this.value)" onchange="renderMain()"></div>'+
+        '<div><label class="f">Valor (R$)</label><input value="'+esc(e.valor)+'" oninput="setAmostra('+i+',\'valor\',this.value)" onchange="renderMain()"></div>'+
         '</div>'+
         '<div class="grid g3" style="margin-top:6px">'+FATS.map(function(f){ return '<div><label class="f">'+esc(f.nome)+'</label>'+selFatObj(i,f,e[f.id])+'</div>'; }).join("")+'</div>'+
         '<div style="margin-top:6px"><label class="f">Link do anúncio</label><input value="'+esc(e.link)+'" oninput="setAmostra('+i+',\'link\',this.value)"></div>'+
@@ -2142,7 +2142,7 @@ function avalPesquisaHtml(a){
   return h;
 }
 function addAmostra(){ if(!editAval.amostra)editAval.amostra=[]; editAval.amostra.push({descricao:"",fonte:"",areaM2:"",valor:"",link:"",topo:"plana",acesso:"pav",loc:"privileg"}); renderMain(); }
-function setAmostra(i,k,v){ editAval.amostra[i][k]=v; if(k==="areaM2"||k==="valor") renderMain(); }
+function setAmostra(i,k,v){ editAval.amostra[i][k]=v; }
 function delAmostra(i){ editAval.amostra.splice(i,1); renderMain(); }
 /* ===== NBR-14653: fatores de homogeneização + Teoria das Pequenas Amostras (t de Student, 80%) ===== */
 // Coeficientes pré-ajustados p/ imóveis rurais (Serra Catarinense) + justificativa automática por opção.
