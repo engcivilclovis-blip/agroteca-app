@@ -2387,7 +2387,7 @@ function subirFotoDrive(file,cb){ if(!file||file.size>12*1024*1024){ cb(null); r
   rd.onerror=function(){ cb(null); }; rd.readAsDataURL(file); }
 // sobe as fotos ainda sem link (para o escritório enxergar as fotos do vistoriador)
 function subirFotosPendentes(fotos,cb){ var pend=(fotos||[]).filter(function(f){return f.dataURI&&!f.link;}); if(!pend.length){ cb(0); return; }
-  var i=0,ok=0; (function prox(){ if(i>=pend.length){ cb(ok); return; } var f=pend[i++]; subirFotoDrive(dataURItoFile(f.dataURI,f.nome||('foto'+i+'.jpg')),function(res){ if(res){ f.link=res.url; f.driveId=res.id; ok++; } prox(); }); })(); }
+  var i=0,ok=0; (function prox(){ if(i>=pend.length){ cb(ok); return; } var f=pend[i++]; var file=null; try{ file=dataURItoFile(f.dataURI,f.nome||('foto'+i+'.jpg')); }catch(e){ file=null; } if(!file){ prox(); return; } subirFotoDrive(file,function(res){ if(res){ f.link=res.url; f.driveId=res.id; ok++; } prox(); }); })(); }
 // miniatura do Drive (exibição na tela; funciona por ser compartilhado "qualquer um com o link")
 function fotoThumb(f){ return f.dataURI || (f.driveId?('https://drive.google.com/thumbnail?id='+f.driveId+'&sz=w1200'):(f.link||'')); }
 // resolve a imagem p/ o Word: base64 do backend (offline) → miniatura (online) → link
@@ -2397,18 +2397,22 @@ function fotoParaWordSrc(f,cb){ if(f.dataURI){ cb(f.dataURI); return; }
 function salvarAvalAcao(silent){
   if(!(editAval.imovel.proprietario||editAval.solicitante||"").trim()){ alert("Informe ao menos o proprietário ou o solicitante."); return; }
   if(modoVist && editAval.status==="Em vistoria") editAval.status="Pesquisa de mercado";
+  _persistirAval(silent);   // salva JÁ na nuvem, sem depender do upload das fotos
+  // as fotos sobem em segundo plano; quando tiverem link, re-salva (sem novo alerta)
   var pend=(editAval.fotos||[]).filter(function(f){return f.dataURI&&!f.link;});
-  if(pend.length && !silent){ var av=document.getElementById('avalSalvarBtn'); }
-  subirFotosPendentes(editAval.fotos, function(nOk){ _persistirAval(silent, pend.length, nOk); });
+  if(pend.length){ subirFotosPendentes(editAval.fotos, function(nOk){ if(nOk>0) _persistirAval(true); }); }
 }
-function _persistirAval(silent, nPend, nOk){
+function _persistirAval(silent){
   var i=avaliacoes.findIndex(function(x){return x.id===editAval.id;});
   if(i>-1)avaliacoes[i]=editAval; else avaliacoes.push(editAval);
   // nuvem: guarda metadados + LINK do Drive (não a imagem base64)
   var doc=JSON.parse(JSON.stringify(editAval)); doc.fotos=(doc.fotos||[]).map(function(f){return {nome:f.nome,legenda:f.legenda,gps:f.gps,quando:f.quando,link:f.link||"",driveId:f.driveId||""};});
-  apiSalvarDoc('avaliacoes',doc); editAval._novo=false;
-  if(!silent){ var extra=nPend?(nOk===nPend?(' '+nOk+' foto(s) enviada(s) à nuvem.'):(' '+nOk+'/'+nPend+' foto(s) enviada(s) — as demais tente novamente.')):''; alert((modoVist?"Vistoria enviada ao escritório.":"Avaliação salva.")+extra); }
-  else { alert("Status salvo."); }
+  editAval._novo=false;
+  var tam=0; try{ tam=JSON.stringify(doc).length; }catch(e){}
+  apiSalvarDoc('avaliacoes',doc).then(function(r){
+    if(r&&r.erro){ if(!silent) alert("⚠️ Não consegui salvar na nuvem: "+r.erro+(tam>45000?(" (avaliação muito grande: "+tam+" caracteres — reduza fotos/coordenadas)"):"")); }
+    else if(!silent){ alert((modoVist?"✅ Vistoria enviada ao escritório e salva.":"✅ Avaliação salva na nuvem.")); }
+  }).catch(function(){ if(!silent) alert("⚠️ Falha de conexão ao salvar. Verifique a internet e tente novamente."); });
   renderMain();
 }
 /* ===== QR Code Generator (Kazuhiko Arase, MIT) — embutido p/ funcionar offline ===== */
@@ -5355,10 +5359,14 @@ function solicHtml(){
     (lista.length?lista.map(function(s){
       return '<div class="list-item" style="cursor:default"><div class="t"><b>'+esc(s.item)+'</b> <span class="tag">'+esc(s.tipo)+'</span>'+(s.valor?' <span class="tag">'+esc(s.valor)+'</span>':'')+
         '<div>'+esc(s.produtor)+' · '+brData(s.criadoEm)+'</div></div>'+
-        '<select onchange="mudarSolic(\''+s.id+'\',this.value)" style="font-size:12px;padding:6px">'+SOLIC_STATUS.map(function(st){return '<option '+(s.status===st?"selected":"")+'>'+st+'</option>';}).join("")+'</select></div>';
+        '<div class="row" style="gap:6px;align-items:center"><select onchange="mudarSolic(\''+s.id+'\',this.value)" style="font-size:12px;padding:6px">'+SOLIC_STATUS.map(function(st){return '<option '+(s.status===st?"selected":"")+'>'+st+'</option>';}).join("")+'</select>'+
+        '<button class="btn sm sec" style="color:var(--erro)" onclick="excluirSolic(\''+s.id+'\')" title="Excluir">🗑</button></div></div>';
     }).join(""):'<div class="card muted">Nenhuma solicitação ainda.</div>');
 }
 function mudarSolic(id,st){ var s=solicitacoes.find(function(x){return x.id===id;}); if(!s)return; s.status=st; salvarSolic(); renderMain(); }
+function excluirSolic(id){ var s=solicitacoes.find(function(x){return x.id===id;}); if(!s)return; if(!confirm('Excluir a solicitação "'+(s.item||'')+'"?\n\nEla some das listas (nada é apagado de verdade — recuperável pelo backup).')) return;
+  apiRemover('solicitacoes',id).then(function(r){ if(r&&r.erro){ alert('⚠️ Não consegui excluir na nuvem: '+r.erro); } }).catch(function(){ alert('⚠️ Falha de conexão ao excluir.'); });
+  solicitacoes=solicitacoes.filter(function(x){return x.id!==id;}); renderMain(); }
 
 /* =========================================================================
    MARKETPLACE — Classificados (compra/venda) + Serviços (credenciados)
