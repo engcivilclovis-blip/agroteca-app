@@ -363,7 +363,7 @@ function apiConfig(chave,valor){ return apiPost('salvarConfig',{chave:chave,valo
 function carregarCfg(){
   // &t= quebra o cache do navegador; cache:'no-store' reforça (senão volta o logo antigo)
   return fetch(API_URL+'?action=config&k='+encodeURIComponent(API_SECRET)+'&t='+Date.now(), {cache:'no-store'}).then(function(r){return r.json();})
-    .then(function(c){ if(c&&!c.erro){ if(/agroteca/i.test(c.brand||'')) c.brand=''; cfg.brand=c.brand||'Sistema'; cfg.tagline=c.tagline||''; cfg.bloqueados=c.bloqueados||[]; if(c.logo!==undefined) cfg.logo=c.logo||''; aplicarTituloGuia(); salvarMarcaCache(); montarPWADinamico(); render(); } }).catch(function(){});
+    .then(function(c){ if(c&&!c.erro){ if(/agroteca/i.test(c.brand||'')) c.brand=''; cfg.brand=c.brand||'Sistema'; cfg.tagline=c.tagline||''; cfg.bloqueados=c.bloqueados||[]; if(c.logo!==undefined) cfg.logo=c.logo||''; aplicarTituloGuia(); salvarMarcaCache(); montarPWADinamico(); prepararLogoPng(); render(); } }).catch(function(){});
 }
 // título da guia do navegador = nome da marca
 function aplicarTituloGuia(){ try{ document.title=(cfg.brand||'Sistema')+(cfg.tagline?(' — '+cfg.tagline):''); }catch(e){} }
@@ -2242,10 +2242,24 @@ function salvarAvalAcao(silent){
   else { alert("Status salvo."); }
   renderMain();
 }
-// cabeçalho institucional (logo + marca) — usado em todos os Word; logo raster (PNG/JPG); SVG não é impresso pelo Word, cai p/ o nome
+// rasteriza o logo (inclusive SVG) para PNG, para o Word conseguir imprimir a imagem
+var LOGO_PNG=null;
+function prepararLogoPng(){
+  try{
+    var src=cfg.logo||''; if(!src){ LOGO_PNG=null; return; }
+    if(/^data:image\/(png|jpe?g|gif|bmp)/i.test(src)){ LOGO_PNG=src; return; } // já é raster
+    var img=new Image();
+    img.onload=function(){ try{ var W=260, H=Math.max(1,Math.round(W*(img.height||60)/(img.width||200)));
+      var cv=document.createElement('canvas'); cv.width=W; cv.height=H; var ctx=cv.getContext('2d');
+      ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,W,H); ctx.drawImage(img,0,0,W,H); LOGO_PNG=cv.toDataURL('image/png'); }catch(e){ LOGO_PNG=null; } };
+    img.onerror=function(){ LOGO_PNG=null; };
+    img.src=src;
+  }catch(e){ LOGO_PNG=null; }
+}
+// cabeçalho institucional (logo + marca) — usado em todos os Word; usa o logo rasterizado (LOGO_PNG)
 function cabecalhoWord(){
-  var isImg=cfg.logo && /^data:image\/(png|jpe?g|gif|bmp)/i.test(cfg.logo);
-  var logo=isImg?('<img src="'+cfg.logo+'" style="height:54px;border:none">'):'';
+  var raster=LOGO_PNG||(cfg.logo && /^data:image\/(png|jpe?g|gif|bmp)/i.test(cfg.logo)?cfg.logo:'');
+  var logo=raster?('<img src="'+raster+'" style="height:54px;border:none">'):'';
   var nome=esc(cfg.brand||'');
   return '<table style="width:100%;margin:0 0 6pt"><tr>'+
     (logo?'<td style="border:none;width:64px;vertical-align:middle;padding:0 8px 0 0">'+logo+'</td>':'')+
@@ -2316,10 +2330,20 @@ function gerarRelatorioFotoWord(id){
   var a=avalById(id)||editAval;
   var comImg=(a.fotos||[]).filter(function(f){return f.dataURI;});
   if(!comImg.length){ alert("Adicione fotos nesta sessão (aba Fotos) antes de gerar o relatório."); return; }
-  var h='<h1>RELATÓRIO FOTOGRÁFICO</h1>'+'<p><b>Proprietário:</b> '+esc(a.imovel.proprietario||"—")+'  ·  <b>Matrícula:</b> '+esc(a.imovel.matricula||"—")+'  ·  '+esc(a.imovel.municipioUf||"")+'</p>';
-  h+='<table>'+comImg.map(function(f,i){ return '<tr><td style="width:50%;text-align:center"><b>Foto '+(i+1)+'</b><br><img src="'+f.dataURI+'" style="max-width:320px"><br><span class="muted">Legenda: '+esc(f.legenda||"")+(f.gps?(' — 📍 '+esc(f.gps)):'')+'</span></td></tr>'; }).join("")+'</table>';
-  h+='<div class="sig">'+(a.imovel.municipioUf||"São Joaquim, SC")+', '+brData(a.dataLaudo)+'.<br>_____________________________________________<br>'+esc(a.responsavel.nome||"")+'</div>';
-  baixarDocWord("Relatorio_Fotografico_"+((a.imovel.proprietario||"imovel").replace(/[^a-z0-9]+/gi,"_")), h);
+  var im=a.imovel||{};
+  var h='<h1>RELATÓRIO FOTOGRÁFICO</h1>';
+  h+='<table style="margin-bottom:8pt"><tr><td style="border:none;padding:2px"><b>Proprietário:</b> '+esc(im.proprietario||"—")+'</td><td style="border:none;padding:2px"><b>Matrícula:</b> '+esc(im.matricula||"—")+'</td></tr>'+
+     '<tr><td style="border:none;padding:2px"><b>Município/UF:</b> '+esc(im.municipioUf||"—")+'</td><td style="border:none;padding:2px"><b>Data:</b> '+brData(a.dataLaudo)+'</td></tr></table>';
+  comImg.forEach(function(f,i){
+    h+='<div style="page-break-inside:avoid;text-align:center;margin:0 0 12pt">'+
+       '<div style="font-weight:bold;font-size:10pt;margin-bottom:2pt">Foto '+(i+1)+'</div>'+
+       '<img src="'+f.dataURI+'" style="width:440px;max-width:100%;border:1px solid #000">'+
+       '<div style="font-size:9pt;color:#333;margin-top:3pt">'+esc(f.legenda||"")+(f.gps?(' &nbsp;·&nbsp; 📍 '+esc(f.gps)):'')+'</div>'+
+       '</div>';
+    if((i+1)%2===0 && i<comImg.length-1) h+='<div style="page-break-after:always"></div>';
+  });
+  h+='<div class="sig">'+(esc(im.municipioUf)||"São Joaquim, SC")+', '+brData(a.dataLaudo)+'.<br>_____________________________________________<br>'+esc(a.responsavel.nome||"")+(a.responsavel.crea?('<br>'+esc(a.responsavel.crea)):'')+'</div>';
+  baixarDocWord("Relatorio_Fotografico_"+((im.proprietario||"imovel").replace(/[^a-z0-9]+/gi,"_")), h);
 }
 
 /* =========================================================================
@@ -3107,6 +3131,7 @@ function salvarModulos(id){
 })();
 cfg={brand:"Sistema", tagline:"Gestão rural digital e integrada", bloqueados:[]};
 carregarMarcaCache();   // marca/logo do cache aparecem já no 1º render (sem flash do nome)
+try{ prepararLogoPng(); }catch(e){}   // prepara o logo (PNG) p/ os documentos Word
 try{ var _c=new URLSearchParams(location.search).get('c'); if(_c) conviteToken=_c; }catch(e){}
 aplicarTituloGuia();
 try{ montarPWADinamico(); }catch(e){}
