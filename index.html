@@ -4993,7 +4993,7 @@ function produtorComunidadeHtml(){
   h+='</div>';
   if(aprov.length) h+=consentCardHtml(aprov);
   var orgsAprov=aprov.map(function(v){return (v.organizacao||'').toLowerCase();});
-  var mural=comunicados.filter(function(c){return orgsAprov.indexOf((c.organizacao||'').toLowerCase())>-1;}).sort(byCriadoDesc);
+  var mural=comunicados.filter(function(c){ if(orgsAprov.indexOf((c.organizacao||'').toLowerCase())<0) return false; if(c.destinatarios&&c.destinatarios.length){ return c.destinatarios.some(function(n){return eqNome(n,user.nome);}); } return true; }).sort(byCriadoDesc);
   h+='<div class="card"><h2>📢 Mural de comunicados ('+mural.length+')</h2>'+(mural.length?mural.map(function(c){return '<div class="card" style="margin:0 0 8px;border-left:4px solid var(--brand)"><b>'+esc(c.titulo)+'</b> <span class="muted small">· '+esc(c.organizacao)+' · '+brData(c.criadoEm)+'</span>'+(c.texto?'<div class="small" style="margin-top:4px;white-space:pre-wrap">'+esc(c.texto)+'</div>':'')+(c.link?'<div style="margin-top:6px"><a class="btn sm sec" href="'+esc(c.link)+'" target="_blank">Abrir</a></div>':'')+'</div>';}).join(""):'<div class="muted small">Nenhum comunicado das suas organizações.</div>')+'</div>';
   if(aprov.length){
     h+='<div class="card"><h2>✉️ Falar com a organização</h2><div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn sm" onclick="produtorMsg(\'mensagem\')">✉️ Enviar mensagem</button><button class="btn sm" onclick="produtorMsg(\'pedido\')">🛒 Fazer pedido de produto/serviço</button></div>';
@@ -5072,13 +5072,28 @@ function comunidadeHtml(){
   var h='<div class="banner info">🤝 Sua comunidade: aprove produtores, envie comunicados em massa e receba mensagens e pedidos. (Ex.: cadeia da maçã — cooperativas de crédito e rurais.)</div>';
   h+='<div class="card"><h2>👥 Meus produtores</h2>';
   if(pend.length){ h+='<div class="small" style="margin-bottom:6px"><b>⏳ Pedidos de vínculo:</b></div>'+pend.map(function(v){return '<div class="kv"><span>'+esc(v.produtor)+'</span><span><button class="btn sm" onclick="aprovarVinculo(\''+v.id+'\')">Aprovar</button> <button class="btn sm sec" onclick="recusarVinculo(\''+v.id+'\')">Recusar</button></span></div>';}).join(""); }
-  h+='<div class="small" style="margin:8px 0 4px"><b>Associados ('+aprov.length+'):</b></div>'+(aprov.length?aprov.map(function(v){ var c=v.consent&&v.consent.aceito; return '<div class="kv"><span>'+esc(v.produtor)+(c?' <span class="pill ok" style="font-size:10px">dados autorizados</span>':'')+'</span><span>'+(c?'<button class="btn sm" onclick="verDadosCompart(\''+v.id+'\')">🔓 Ver dados</button> ':'')+'<button class="btn sm sec" onclick="removerVinculo(\''+v.id+'\')">Remover</button></span></div>';}).join(""):'<div class="muted small">Nenhum associado ainda.</div>')+'</div>';
-  h+='<div class="card"><h2>📢 Enviar comunicado em massa</h2><label class="f">Título</label><input id="comTit" type="text" placeholder="Ex.: Reunião de safra / Aviso de colheita">'+
+  h+='<div class="small" style="margin:8px 0 4px"><b>Associados ('+aprov.length+'):</b></div>'+(aprov.length?aprov.map(function(v){ var c=v.consent&&v.consent.aceito; return '<div class="kv"><span>'+esc(v.produtor)+(c?' <span class="pill ok" style="font-size:10px">dados autorizados</span>':'')+'</span><span>'+(c?'<button class="btn sm" onclick="verDadosCompart(\''+v.id+'\')">🔓 Ver dados</button> ':'')+'<button class="btn sm sec" onclick="removerVinculo(\''+v.id+'\')">Remover</button></span></div>';}).join(""):'<div class="muted small">Nenhum associado ainda.</div>');
+  // vincular produtor diretamente (sem esperar o pedido do produtor)
+  var jaMembros=membros.map(function(v){return (v.produtor||'').toLowerCase();});
+  var candProd=(diretorio||[]).filter(function(u){return u.papel==='produtor' && jaMembros.indexOf((u.nome||'').toLowerCase())<0;});
+  h+='<div style="margin-top:10px"><label class="f">➕ Vincular produtor diretamente (sem esperar o pedido)</label><div class="row" style="gap:6px"><select id="selAddAssoc" style="flex:1"><option value="">— escolha um produtor —</option>'+candProd.map(function(u){return '<option value="'+esc(u.nome)+'">'+esc(u.nome)+(u.fone?(' — '+esc(u.fone)):'')+'</option>';}).join("")+'</select><button class="btn sm" onclick="addAssociado()">Adicionar</button></div>'+(candProd.length?'':'<div class="muted small" style="margin-top:4px">Todos os produtores do diretório já estão vinculados.</div>')+'</div></div>';
+  // ---- enviar comunicado com seleção de destinatários + WhatsApp ----
+  h+='<div class="card"><h2>📢 Enviar comunicado em massa</h2>'+
+    '<label class="f">Título</label><input id="comTit" type="text" placeholder="Ex.: Reunião de safra / Aviso de colheita">'+
     '<label class="f" style="margin-top:8px">Mensagem</label><textarea id="comTxt"></textarea>'+
     '<label class="f" style="margin-top:8px">Link (opcional)</label><input id="comLink" type="text" placeholder="https://...">'+
-    '<div style="height:8px"></div><button class="btn" onclick="enviarComunicado()">📢 Publicar para '+aprov.length+' produtor(es)</button></div>';
+    '<div style="margin-top:10px"><div class="row" style="justify-content:space-between;align-items:center"><label class="f" style="margin:0">Destinatários</label><label class="small" style="display:flex;gap:5px;align-items:center"><input type="checkbox" checked onclick="marcarTodosCom(this.checked)"> selecionar todos</label></div>'+
+      (aprov.length?('<div style="max-height:170px;overflow:auto;border:1px solid var(--line,#d8e1ef);border-radius:8px;padding:6px;margin-top:4px">'+aprov.map(function(v){var fone=foneDir(v.produtor);return '<label class="small" style="display:flex;gap:6px;align-items:center;padding:2px 0"><input type="checkbox" class="comChk" data-nome="'+esc(v.produtor)+'" checked> '+esc(v.produtor)+(fone?'':' <span class="muted">(sem WhatsApp cadastrado)</span>')+'</label>';}).join("")+'</div>')
+        :'<div class="muted small">Nenhum associado para enviar. Vincule produtores acima.</div>')+'</div>'+
+    '<div style="height:8px"></div><div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn" onclick="enviarComunicado(false)">📢 Publicar no sistema</button><button class="btn" onclick="enviarComunicado(true)">📢📲 Publicar + WhatsApp</button></div></div>';
+  // painel de envio por WhatsApp (um toque por produtor — o WhatsApp não envia em massa p/ grupo)
+  if(comWaId){ var cw=comunicados.find(function(x){return x.id===comWaId;}); if(cw){ var dst=cw.destinatarios&&cw.destinatarios.length?cw.destinatarios:aprov.map(function(v){return v.produtor;});
+    h+='<div class="card" style="border:1px dashed var(--brand)"><div class="row" style="justify-content:space-between;align-items:center"><h2 style="margin:0">📲 Enviar no WhatsApp — "'+esc(cw.titulo||"comunicado")+'"</h2><button class="btn sm sec" onclick="fecharWaCom()">Fechar</button></div>'+
+      '<p class="muted small">Toque em cada produtor para abrir o WhatsApp com a mensagem pronta (o WhatsApp exige enviar um a um).</p>'+
+      dst.map(function(n){var fone=foneDir(n);return '<div class="kv"><span>'+esc(n)+(fone?'':' <span class="muted">(sem número)</span>')+'</span>'+(fone?'<button class="btn sm" onclick="waComProd(\''+encodeURIComponent(n)+'\',\''+cw.id+'\')">📲 Enviar</button>':'')+'</div>';}).join("")+'</div>';
+  } }
   var meus=comunicados.filter(function(c){return eqNome(c.organizacao,orgNome);}).sort(byCriadoDesc);
-  if(meus.length) h+='<div class="card"><h2>Comunicados enviados</h2>'+meus.map(function(c){return '<div class="kv"><span><b>'+esc(c.titulo)+'</b> <span class="muted small">'+esc((c.texto||'').slice(0,40))+'</span></span><span class="muted small">'+brData(c.criadoEm)+' <button class="btn sm sec" onclick="excluirComunicado(\''+c.id+'\')">✕</button></span></div>';}).join("")+'</div>';
+  if(meus.length) h+='<div class="card"><h2>Comunicados enviados</h2>'+meus.map(function(c){var nd=(c.destinatarios&&c.destinatarios.length)?c.destinatarios.length:aprov.length;return '<div class="kv"><span><b>'+esc(c.titulo)+'</b> <span class="muted small">'+esc((c.texto||'').slice(0,40))+' · '+nd+' destinatário(s)</span></span><span class="muted small">'+brData(c.criadoEm)+' <button class="btn sm sec" onclick="abrirWaCom(\''+c.id+'\')" title="Enviar no WhatsApp">📲</button> <button class="btn sm sec" onclick="excluirComunicado(\''+c.id+'\')">✕</button></span></div>';}).join("")+'</div>';
   var receb=mensagensCoop.filter(function(mm){return eqNome(mm.organizacao,orgNome);}).sort(byCriadoDesc);
   h+='<div class="card"><h2>✉️ Mensagens & pedidos recebidos ('+receb.length+')</h2>'+(receb.length?receb.map(function(mm){
     return '<div class="card" style="margin:0 0 8px"><div class="row" style="justify-content:space-between"><b>'+(mm.tipo==='pedido'?'🛒 Pedido':'✉️ Mensagem')+' — '+esc(mm.produtor)+'</b>'+(mm.tipo==='pedido'?statusPill(mm.status):'')+'</div>'+
@@ -5094,12 +5109,28 @@ function comunidadeHtml(){
 function aprovarVinculo(id){ var v=vincById(id); if(!v)return; v.status='Aprovado'; salvarVinculos(); renderMain(); }
 function recusarVinculo(id){ var v=vincById(id); if(!v)return; v.status='Recusado'; salvarVinculos(); renderMain(); }
 function removerVinculo(id){ var v=vincById(id); if(!v)return; if(!confirm('Remover este produtor da organização?'))return; apiRemover('vinculos',id); var i=vinculos.findIndex(function(x){return x.id===id;}); if(i>-1)vinculos.splice(i,1); renderMain(); }
-function enviarComunicado(){
+var comWaId=null;
+function addAssociado(){ var el=document.getElementById('selAddAssoc'); var nome=el?el.value:''; if(!nome){ alert('Escolha um produtor.'); return; }
+  vinculos.push({id:uid(),criadoEm:new Date().toISOString(),produtor:nome,organizacao:user.nome,status:'Aprovado',adicionadoPeloEscritorio:true}); salvarVinculos();
+  alert(nome+' foi vinculado(a) à comunidade.'); renderMain(); }
+function coletarDestinatarios(){ var out=[]; try{ var els=document.querySelectorAll('.comChk'); Array.prototype.forEach.call(els,function(e){ if(e.checked) out.push(e.getAttribute('data-nome')); }); }catch(e){} return out; }
+function marcarTodosCom(v){ try{ var els=document.querySelectorAll('.comChk'); Array.prototype.forEach.call(els,function(e){ e.checked=v; }); }catch(e){} }
+function enviarComunicado(comWhats){
   var t=(document.getElementById('comTit')||{}).value||'', tx=(document.getElementById('comTxt')||{}).value||'', lk=(document.getElementById('comLink')||{}).value||'';
   if(!t.trim() && !tx.trim()){ alert('Escreva ao menos um título ou uma mensagem.'); return; }
-  comunicados.push({id:uid(),criadoEm:new Date().toISOString(),organizacao:user.nome,titulo:t,texto:tx,link:lk}); salvarComunicados();
-  alert('Comunicado publicado para seus produtores associados.'); renderMain();
+  var dest=coletarDestinatarios();
+  if(!dest.length){ alert('Selecione ao menos um destinatário.'); return; }
+  var com={id:uid(),criadoEm:new Date().toISOString(),organizacao:user.nome,titulo:t,texto:tx,link:lk,destinatarios:dest};
+  comunicados.push(com);
+  apiSalvarDoc('comunicados',com).then(function(r){ if(r&&r.erro) alert('⚠️ Não consegui salvar o comunicado: '+r.erro); }).catch(function(){ alert('⚠️ Falha de conexão ao publicar o comunicado.'); });
+  if(comWhats){ comWaId=com.id; renderMain(); }
+  else { comWaId=null; alert('✅ Comunicado publicado no sistema para '+dest.length+' destinatário(s). Eles verão no “Mural de comunicados”.'); renderMain(); }
 }
+function abrirWaCom(id){ comWaId=id; renderMain(); }
+function fecharWaCom(){ comWaId=null; renderMain(); }
+function waComProd(nomeEnc,comId){ var nome=decodeURIComponent(nomeEnc); var c=comunicados.find(function(x){return x.id===comId;}); if(!c)return;
+  var msg="*"+(cfg.brand||"Sistema")+"* — "+(c.titulo||"Comunicado")+"\n"+(c.texto||"")+(c.link?("\n"+c.link):""); abrirWa2(foneDir(nome), msg); }
+function excluirComunicado(id){ if(!confirm('Excluir este comunicado?'))return; apiRemover('comunicados',id); var i=comunicados.findIndex(function(x){return x.id===id;}); if(i>-1)comunicados.splice(i,1); if(comWaId===id)comWaId=null; renderMain(); }
 function excluirComunicado(id){ if(!confirm('Excluir este comunicado?'))return; apiRemover('comunicados',id); var i=comunicados.findIndex(function(x){return x.id===id;}); if(i>-1)comunicados.splice(i,1); renderMain(); }
 function responderMsgCoop(id){ var mm=msgCoopById(id); if(!mm)return; var r=prompt('Resposta ao produtor:',mm.resposta||''); if(r==null)return; mm.resposta=r; salvarMensagensCoop(); renderMain(); setTimeout(function(){ if(confirm('Avisar o produtor pelo WhatsApp?')) avisarProdutorWa(id); },150); }
 function statusPedidoCoop(id,st){ var mm=msgCoopById(id); if(!mm)return; mm.status=st; salvarMensagensCoop(); renderMain(); }
