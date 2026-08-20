@@ -363,13 +363,13 @@ function apiConfig(chave,valor){ return apiPost('salvarConfig',{chave:chave,valo
 function carregarCfg(){
   // &t= quebra o cache do navegador; cache:'no-store' reforça (senão volta o logo antigo)
   return fetch(API_URL+'?action=config&k='+encodeURIComponent(API_SECRET)+'&t='+Date.now(), {cache:'no-store'}).then(function(r){return r.json();})
-    .then(function(c){ if(c&&!c.erro){ cfg.brand=c.brand||'Sistema'; cfg.tagline=c.tagline||''; cfg.bloqueados=c.bloqueados||[]; if(c.logo!==undefined) cfg.logo=c.logo||''; aplicarTituloGuia(); salvarMarcaCache(); montarPWADinamico(); render(); } }).catch(function(){});
+    .then(function(c){ if(c&&!c.erro){ if(/agroteca/i.test(c.brand||'')) c.brand=''; cfg.brand=c.brand||'Sistema'; cfg.tagline=c.tagline||''; cfg.bloqueados=c.bloqueados||[]; if(c.logo!==undefined) cfg.logo=c.logo||''; aplicarTituloGuia(); salvarMarcaCache(); montarPWADinamico(); render(); } }).catch(function(){});
 }
 // título da guia do navegador = nome da marca
 function aplicarTituloGuia(){ try{ document.title=(cfg.brand||'Sistema')+(cfg.tagline?(' — '+cfg.tagline):''); }catch(e){} }
 // cache da marca (nome+slogan+logo) no aparelho — aparece na hora na próxima abertura, sem "flash" do nome
 function salvarMarcaCache(){ try{ localStorage.setItem('agt_marca', JSON.stringify({brand:cfg.brand||'', tagline:cfg.tagline||'', logo:cfg.logo||''})); }catch(e){} }
-function carregarMarcaCache(){ try{ var mc=JSON.parse(localStorage.getItem('agt_marca')||'null'); if(mc){ if(mc.brand)cfg.brand=mc.brand; if(mc.tagline!==undefined)cfg.tagline=mc.tagline; if(mc.logo!==undefined)cfg.logo=mc.logo; } }catch(e){} }
+function carregarMarcaCache(){ try{ var mc=JSON.parse(localStorage.getItem('agt_marca')||'null'); if(mc){ if(/agroteca/i.test(mc.brand||'')){ localStorage.removeItem('agt_marca'); return; } if(mc.brand)cfg.brand=mc.brand; if(mc.tagline!==undefined)cfg.tagline=mc.tagline; if(mc.logo!==undefined)cfg.logo=mc.logo; } }catch(e){} }
 // carrega todas as coleções após o login numa ÚNICA chamada (rápido)
 function carregarDados(){ return carregarComRetry_(3); }
 function carregarComRetry_(tentativas){
@@ -1901,6 +1901,7 @@ function novoAval(){ return {id:uid(),criadoEm:new Date().toISOString(),vistoria
   responsavel:Object.assign({},RESP_PADRAO), dataLaudo:hoje(), fotos:[], movimentos:[], arquivado:false, _novo:true }; }
 
 function avalListaHtml(){
+  ensureFatores();
   var lista=avaliacoes.filter(function(a){return podeVerAval(a)&&!a.arquivado;}).sort(function(a,b){return (b.criadoEm||"").localeCompare(a.criadoEm||"");});
   var h='<div class="row" style="justify-content:flex-end;margin-bottom:8px"><button class="btn" onclick="novaAval()">➕ Nova vistoria/avaliação</button></div>';
   h+='<div class="banner info">📐 Vistoria de avaliação (PTAM): preencha os dados do imóvel, monte a pesquisa de mercado e bata as fotos — o sistema gera o <b>laudo</b> e o <b>relatório fotográfico</b> em Word pré-preenchidos.</div>';
@@ -1953,16 +1954,14 @@ function addCoord(){ if(!editAval.coordenadas)editAval.coordenadas=[]; editAval.
 function setCoord(i,k,v){ editAval.coordenadas[i][k]=v; }
 function delCoord(i){ editAval.coordenadas.splice(i,1); renderMain(); }
 function avalPesquisaHtml(a){
-  var c=calcAval(a); var av=a.avaliando||{};
-  function selFat(scope,tab,key,val){ var oc=(scope==="av")?("setAval('avaliando."+key+"',this.value);renderMain()"):("setAmostra("+scope+",'"+key+"',this.value);renderMain()");
-    return '<select onchange="'+oc+'" style="width:100%;padding:7px;border:1px solid #cfd8e3;border-radius:8px;background:#fff">'+tab.map(function(o){return '<option value="'+o.k+'"'+(val===o.k?' selected':'')+'>'+o.l+' — '+o.c.toFixed(2)+'</option>';}).join("")+'</select>'; }
-  var h='<div class="card"><h2>🎯 Características do imóvel avaliando (paradigma dos fatores)</h2>'+
-    '<p class="muted small">Cada fator do elemento = coeficiente do avaliando ÷ coeficiente do elemento (limitado a 0,40–2,50), conforme a NBR-14653.</p>'+
-    '<div class="grid g3" style="margin-top:6px">'+
-      '<div><label class="f">Localização (F1)</label>'+selFat("av",FAT_LOC,"loc",av.loc)+'</div>'+
-      '<div><label class="f">Acesso (F2)</label>'+selFat("av",FAT_ACESSO,"acesso",av.acesso)+'</div>'+
-      '<div><label class="f">Topografia (F3)</label>'+selFat("av",FAT_TOPO,"topo",av.topo)+'</div>'+
-    '</div></div>';
+  ensureFatores();
+  var c=calcAval(a); var av=a.avaliando||{}; var FATS=fatoresAtivos();
+  function selFatObj(scope,f,val){ var oc=(scope==="av")?("setAval('avaliando."+f.id+"',this.value);renderMain()"):("setAmostra("+scope+",'"+f.id+"',this.value);renderMain()");
+    return '<select onchange="'+oc+'" style="width:100%;padding:7px;border:1px solid #cfd8e3;border-radius:8px;background:#fff">'+f.opcoes.map(function(o){return '<option value="'+esc(o.k)+'"'+(val===o.k?' selected':'')+'>'+esc(o.l)+' — '+Number(o.c).toFixed(2)+'</option>';}).join("")+'</select>'; }
+  var h='<div class="card"><div class="row" style="justify-content:space-between;align-items:center;gap:8px"><h2 style="margin:0">🎯 Características do imóvel avaliando</h2><button class="btn sm sec" onclick="toggleCfgFatores()">⚙️ Configurar fatores</button></div>'+
+    '<p class="muted small" style="margin-top:6px">Cada fator do elemento = coeficiente do avaliando ÷ coeficiente do elemento (limitado a 0,40–2,50), conforme a NBR-14653. Use “Configurar fatores” para acrescentar novos critérios (ex.: aproveitamento, recursos hídricos) — inclusive os futuros fatores urbanos.</p>'+
+    (ptamCfgFatores?cfgFatoresHtml():'')+
+    '<div class="grid g3" style="margin-top:6px">'+FATS.map(function(f){ return '<div><label class="f">'+esc(f.nome)+(f.sigla?(' ('+esc(f.sigla)+')'):'')+'</label>'+selFatObj("av",f,av[f.id])+'</div>'; }).join("")+'</div></div>';
   h+='<div class="card"><h2>Amostra de imóveis comparativos ('+(a.amostra||[]).length+')</h2>'+
     ((a.amostra||[]).length?a.amostra.map(function(e,i){
       var el=(c.elementos&&c.elementos[i])||{};
@@ -1973,13 +1972,9 @@ function avalPesquisaHtml(a){
         '<div><label class="f">Área (m²)</label><input value="'+esc(e.areaM2)+'" oninput="setAmostra('+i+',\'areaM2\',this.value)"></div>'+
         '<div><label class="f">Valor (R$)</label><input value="'+esc(e.valor)+'" oninput="setAmostra('+i+',\'valor\',this.value)"></div>'+
         '</div>'+
-        '<div class="grid g3" style="margin-top:6px">'+
-          '<div><label class="f">Localização</label>'+selFat(i,FAT_LOC,"loc",e.loc)+'</div>'+
-          '<div><label class="f">Acesso</label>'+selFat(i,FAT_ACESSO,"acesso",e.acesso)+'</div>'+
-          '<div><label class="f">Topografia</label>'+selFat(i,FAT_TOPO,"topo",e.topo)+'</div>'+
-        '</div>'+
+        '<div class="grid g3" style="margin-top:6px">'+FATS.map(function(f){ return '<div><label class="f">'+esc(f.nome)+'</label>'+selFatObj(i,f,e[f.id])+'</div>'; }).join("")+'</div>'+
         '<div style="margin-top:6px"><label class="f">Link do anúncio</label><input value="'+esc(e.link)+'" oninput="setAmostra('+i+',\'link\',this.value)"></div>'+
-        (el.raw!=null?'<div class="muted small" style="margin-top:6px">Unitário bruto: '+fmt2(el.raw)+'/m² &nbsp;·&nbsp; F1 '+fmt2(el.f1)+' × F2 '+fmt2(el.f2)+' × F3 '+fmt2(el.f3)+' → <b>Homogeneizado: '+fmt2(el.xi)+'/m²</b></div>':'')+'</div>';
+        (el.raw!=null?'<div class="muted small" style="margin-top:6px">Unitário bruto: '+fmt2(el.raw)+'/m² &nbsp;·&nbsp; '+FATS.map(function(f){return esc(f.sigla||f.nome)+' '+fmt2(el.fatores&&el.fatores[f.id]);}).join(' × ')+' → <b>Homogeneizado: '+fmt2(el.xi)+'/m²</b></div>':'')+'</div>';
     }).join(""):'<div class="muted small">Adicione os elementos da amostra (mín. 2 para calcular).</div>')+
     '<div style="height:8px"></div><button class="btn sm" onclick="addAmostra()">➕ Adicionar imóvel à amostra</button></div>'+
     txtAv("Homogeneização (texto do método)","homogeneizacao",a.homogeneizacao);
@@ -1987,10 +1982,11 @@ function avalPesquisaHtml(a){
   h+='<div class="card"><h2>💹 Tratamento estatístico (NBR-14653 · pequenas amostras · 80%)</h2>';
   if(c.unitM2==null){ h+='<div class="muted small">Preencha ao menos 2 imóveis com área e valor.</div>'; }
   else {
+    var FATc=c.fatores||FATS;
     h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;margin:6px 0">'+
-       '<tr style="background:var(--surface2,#eef2f8)"><th style="padding:5px;text-align:left">#</th><th style="padding:5px">Bruto R$/m²</th><th style="padding:5px">F1</th><th style="padding:5px">F2</th><th style="padding:5px">F3</th><th style="padding:5px">Xi homog.</th><th style="padding:5px">d/S</th><th style="padding:5px">Chauvenet</th></tr>';
+       '<tr style="background:var(--surface2,#eef2f8)"><th style="padding:5px;text-align:left">#</th><th style="padding:5px">Bruto R$/m²</th>'+FATc.map(function(f){return '<th style="padding:5px">'+esc(f.sigla||f.nome)+'</th>';}).join("")+'<th style="padding:5px">Xi homog.</th><th style="padding:5px">d/S</th><th style="padding:5px">Chauvenet</th></tr>';
     (c.elementos||[]).forEach(function(el,i){ if(el.raw==null)return;
-      h+='<tr style="border-top:1px solid #e3e9f2"><td style="padding:5px">'+(i+1)+'</td><td style="padding:5px;text-align:center">'+fmt2(el.raw)+'</td><td style="padding:5px;text-align:center">'+fmt2(el.f1)+'</td><td style="padding:5px;text-align:center">'+fmt2(el.f2)+'</td><td style="padding:5px;text-align:center">'+fmt2(el.f3)+'</td><td style="padding:5px;text-align:center"><b>'+fmt2(el.xi)+'</b></td><td style="padding:5px;text-align:center">'+fmt2(el.d)+'</td><td style="padding:5px;text-align:center">'+(el.ok?'✔':'✕ excl.')+'</td></tr>'; });
+      h+='<tr style="border-top:1px solid #e3e9f2"><td style="padding:5px">'+(i+1)+'</td><td style="padding:5px;text-align:center">'+fmt2(el.raw)+'</td>'+FATc.map(function(f){return '<td style="padding:5px;text-align:center">'+fmt2(el.fatores&&el.fatores[f.id])+'</td>';}).join("")+'<td style="padding:5px;text-align:center"><b>'+fmt2(el.xi)+'</b></td><td style="padding:5px;text-align:center">'+fmt2(el.d)+'</td><td style="padding:5px;text-align:center">'+(el.ok?'✔':'✕ excl.')+'</td></tr>'; });
     h+='</table></div>';
     h+='<div class="kv"><span>Média homogeneizada (X)</span><span><b>'+fmt2(c.X)+'</b>/m²</span></div>'+
        '<div class="kv"><span>Desvio padrão (S)</span><span>'+fmt2(c.S)+'</span></div>'+
@@ -2029,6 +2025,25 @@ var FAT_LOC=[
  {k:"isolada",l:"Isolada",c:0.70,j:"localização isolada, distante de centros logísticos e de abastecimento, com reflexo no valor de mercado"}];
 function fatItem(tab,k){ for(var i=0;i<tab.length;i++){ if(tab[i].k===k) return tab[i]; } return tab[0]; }
 function fatorRel(cav,cam){ var f=cav/cam; if(!isFinite(f)||f<=0)f=1; return Math.max(0.40,Math.min(2.50,Math.round(f*100)/100)); }
+/* ===== REGISTRO CONFIGURÁVEL DE FATORES =====
+   Os 3 fatores abaixo são só o PADRÃO DE FÁBRICA. O master pode acrescentar/editar
+   quantos fatores quiser (ex.: aproveitamento, recursos hídricos, exposição solar) e,
+   no futuro, os fatores do modelo URBANO. A configuração é salva no servidor (coleção
+   'configptam') e vale para todos os laudos. IDs 'loc'/'acesso'/'topo' mantidos p/
+   compatibilidade com avaliações já salvas. */
+var FATORES_DEFAULT=[
+ {id:"loc",nome:"Localização",sigla:"F1",ativo:true,opcoes:FAT_LOC},
+ {id:"acesso",nome:"Acesso",sigla:"F2",ativo:true,opcoes:FAT_ACESSO},
+ {id:"topo",nome:"Topografia",sigla:"F3",ativo:true,opcoes:FAT_TOPO}];
+var fatoresDef=null, _fatCarregado=false, _fatCarregando=false;
+function getFatores(){ return (fatoresDef&&fatoresDef.length)?fatoresDef:FATORES_DEFAULT; }
+function fatoresAtivos(){ return getFatores().filter(function(f){return f.ativo!==false && f.opcoes && f.opcoes.length;}); }
+function fatOpc(f,k){ return fatItem(f.opcoes,k); }
+function fatoresEdit(){ if(!fatoresDef) fatoresDef=JSON.parse(JSON.stringify(FATORES_DEFAULT)); return fatoresDef; }
+function ensureFatores(){ if(!_fatCarregado && !_fatCarregando){ _fatCarregando=true; carregarFatoresPTAM().then(function(){ _fatCarregando=false; renderMain(); }); } }
+function carregarFatoresPTAM(){ return apiListar('configptam').then(function(l){ var doc=(l||[]).filter(function(d){return d&&d.tipo==='fatores';})[0]; if(doc&&doc.fatores&&doc.fatores.length) fatoresDef=doc.fatores; _fatCarregado=true; }).catch(function(){ _fatCarregado=true; }); }
+function salvarFatoresPTAM(){ return apiSalvarDoc('configptam',{id:'ptam-fatores',tipo:'fatores',fatores:getFatores()}); }
+function slugFator(s){ return (String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"").slice(0,20))||("f"+Date.now().toString(36)); }
 // t de Student — percentis para 80% de confiança (bicaudal), por graus de liberdade
 var T80={1:3.078,2:1.886,3:1.638,4:1.533,5:1.476,6:1.440,7:1.415,8:1.397,9:1.383,10:1.372,11:1.363,12:1.356,13:1.350,14:1.345,15:1.341,16:1.337,17:1.333,18:1.330,19:1.328,20:1.325,21:1.323,22:1.321,23:1.319,24:1.318,25:1.316,26:1.315,27:1.314,28:1.313,29:1.311};
 function t80(gl){ gl=Math.round(gl); if(gl<1)return T80[1]; if(T80[gl])return T80[gl]; if(gl>=29)return 1.311; return 1.34; }
@@ -2036,16 +2051,45 @@ function fmt2(x){ return (x==null||isNaN(x))?"—":Number(x).toLocaleString("pt-
 function chauvenetDmax(n){ var t={2:1.15,3:1.38,4:1.54,5:1.65,6:1.73,7:1.80,8:1.86,9:1.91,10:1.96,12:2.03,15:2.13,20:2.24,25:2.33,30:2.39};
   if(t[n])return t[n]; if(n<2)return 999; if(n>30)return 2.5; var ks=Object.keys(t).map(Number).sort(function(a,b){return a-b;}), lo=ks[0],hi=ks[ks.length-1];
   for(var i=0;i<ks.length-1;i++){ if(n>=ks[i]&&n<=ks[i+1]){lo=ks[i];hi=ks[i+1];break;} } return t[lo]+(t[hi]-t[lo])*((n-lo)/(hi-lo)); }
+/* ---- editor de configuração de fatores (master) ---- */
+var ptamCfgFatores=false;
+function toggleCfgFatores(){ ptamCfgFatores=!ptamCfgFatores; renderMain(); }
+function cfgFatoresHtml(){
+  var fs=getFatores();
+  var h='<div class="card" style="border:1px dashed var(--brand);background:var(--surface2,#f2f6fc);margin-top:8px"><div class="row" style="justify-content:space-between;align-items:center;gap:8px"><b>⚙️ Fatores de comparação (configuração)</b><div class="row" style="gap:6px"><button class="btn sm" onclick="salvarFatoresAcao()">💾 Salvar</button><button class="btn sm sec" onclick="restaurarFatoresAcao()">↺ Padrão</button></div></div>'+
+    '<p class="muted small" style="margin-top:4px">Acrescente critérios e ajuste coeficientes/justificativas. Vale para todos os laudos. Coef. 1,00 = referência (melhor situação); valores menores penalizam. As justificativas entram automaticamente no laudo.</p>';
+  fs.forEach(function(f,fi){
+    h+='<div class="card" style="margin:8px 0;background:#fff"><div class="grid g3" style="align-items:end">'+
+       '<div><label class="f">Nome do fator</label><input value="'+esc(f.nome)+'" oninput="setFatorCampo('+fi+',\'nome\',this.value)"></div>'+
+       '<div><label class="f">Sigla</label><input value="'+esc(f.sigla||'')+'" oninput="setFatorCampo('+fi+',\'sigla\',this.value)"></div>'+
+       '<div class="row" style="gap:10px;align-items:center"><label class="f" style="margin:0;display:flex;gap:5px;align-items:center"><input type="checkbox" '+(f.ativo!==false?'checked':'')+' onchange="setFatorCampo('+fi+',\'ativo\',this.checked)"> usar</label><button class="btn sm sec" style="color:var(--erro)" onclick="delFator('+fi+')">🗑</button></div>'+
+       '</div>'+
+       '<div style="overflow-x:auto;margin-top:6px"><table style="width:100%;border-collapse:collapse;font-size:12px"><tr style="background:var(--surface2,#eef2f8)"><th style="padding:4px;text-align:left">Opção</th><th style="padding:4px">Coef.</th><th style="padding:4px;text-align:left">Justificativa (laudo)</th><th></th></tr>'+
+       (f.opcoes||[]).map(function(o,oi){ return '<tr><td style="padding:3px"><input value="'+esc(o.l)+'" oninput="setOpcao('+fi+','+oi+',\'l\',this.value)" style="width:100%"></td><td style="padding:3px"><input value="'+esc(String(o.c))+'" oninput="setOpcao('+fi+','+oi+',\'c\',this.value)" style="width:64px;text-align:center"></td><td style="padding:3px"><input value="'+esc(o.j||'')+'" oninput="setOpcao('+fi+','+oi+',\'j\',this.value)" style="width:100%"></td><td style="padding:3px"><button class="btn sm sec" onclick="delOpcao('+fi+','+oi+')">✕</button></td></tr>'; }).join("")+
+       '</table></div><button class="btn sm sec" style="margin-top:6px" onclick="addOpcao('+fi+')">➕ opção</button></div>';
+  });
+  h+='<button class="btn sm" onclick="addFator()">➕ Adicionar fator de comparação</button></div>';
+  return h;
+}
+function addFator(){ var fs=fatoresEdit(); var n=fs.length+1; fs.push({id:'f_'+uid(),nome:'Novo fator '+n,sigla:'F'+n,ativo:true,opcoes:[{k:'padrao',l:'Padrão / referência',c:1.00,j:''},{k:'inferior',l:'Situação inferior',c:0.85,j:''}]}); renderMain(); }
+function delFator(fi){ var fs=fatoresEdit(); if(fs.length<=1){ alert('Mantenha ao menos um fator.'); return; } if(!confirm('Remover este fator?'))return; fs.splice(fi,1); renderMain(); }
+function setFatorCampo(fi,k,v){ var fs=fatoresEdit(); fs[fi][k]=v; if(k==='ativo') renderMain(); }
+function addOpcao(fi){ var fs=fatoresEdit(); if(!fs[fi].opcoes)fs[fi].opcoes=[]; fs[fi].opcoes.push({k:'op'+uid(),l:'Nova opção',c:1.00,j:''}); renderMain(); }
+function delOpcao(fi,oi){ var fs=fatoresEdit(); if(fs[fi].opcoes.length<=1){ alert('Cada fator precisa de ao menos uma opção.'); return; } fs[fi].opcoes.splice(oi,1); renderMain(); }
+function setOpcao(fi,oi,k,v){ var fs=fatoresEdit(); var o=fs[fi].opcoes[oi]; if(k==='c'){ var nn=parseFloat(String(v).replace(',','.')); if(!isNaN(nn)) o.c=nn; } else { o[k]=v; } }
+function salvarFatoresAcao(){ salvarFatoresPTAM().then(function(){ alert('Configuração de fatores salva (vale para todos os laudos).'); }).catch(function(){ alert('Não foi possível salvar agora.'); }); }
+function restaurarFatoresAcao(){ if(!confirm('Restaurar os fatores padrão de fábrica?'))return; fatoresDef=JSON.parse(JSON.stringify(FATORES_DEFAULT)); salvarFatoresPTAM(); renderMain(); }
 function calcAval(a){
   function mean(x){return x.reduce(function(s,v){return s+v;},0)/x.length;}
   var av=a.avaliando||{};
-  var avT=fatItem(FAT_TOPO,av.topo).c, avA=fatItem(FAT_ACESSO,av.acesso).c, avL=fatItem(FAT_LOC,av.loc).c;
-  // 1) por elemento: unitário bruto (R$/m²) e homogeneização Xi = bruto × F1(loc) × F2(acesso) × F3(topo)
+  var FATS=fatoresAtivos();  // conjunto CONFIGURÁVEL de fatores (padrão: loc/acesso/topo)
+  // 1) por elemento: unitário bruto (R$/m²) e homogeneização Xi = bruto × Π(fatores)
   var elementos=(a.amostra||[]).map(function(e){
     var ar=num(e.areaM2), v=num(e.valor), raw=(ar&&v&&ar>0)?(v/ar):null;
-    if(raw==null) return {raw:null};
-    var f1=fatorRel(avL,fatItem(FAT_LOC,e.loc).c), f2=fatorRel(avA,fatItem(FAT_ACESSO,e.acesso).c), f3=fatorRel(avT,fatItem(FAT_TOPO,e.topo).c);
-    return {raw:raw,f1:f1,f2:f2,f3:f3,xi:raw*f1*f2*f3};
+    if(raw==null) return {raw:null,fatores:{}};
+    var prod=1, fatores={};
+    FATS.forEach(function(f){ var fv=fatorRel(fatOpc(f,av[f.id]).c, fatOpc(f,e[f.id]).c); fatores[f.id]=fv; prod*=fv; });
+    return {raw:raw,fatores:fatores,fprod:prod,xi:raw*prod};
   });
   var validos=elementos.filter(function(x){return x.raw!=null;});
   if(validos.length<2) return {n:validos.length,unitM2:null,saneada:[],removidos:[],elementos:elementos};
@@ -2066,7 +2110,7 @@ function calcAval(a){
   var areaHa=num(a.imovel.areaTotalM2)?num(a.imovel.areaTotalM2)/10000:null;
   var fl=num(a.calc&&a.calc.fatorLiquidez); if(fl==null||fl<=0)fl=0.95; if(fl>1)fl=fl/100;
   var vM=areaHa!=null?unitHa*areaHa:null, vL=vM!=null?vM*fl:null;
-  return {n:validos.length,nSan:n2,elementos:elementos,saneadaEl:saneadaEl,saneada:saneada,removidos:removidos,
+  return {n:validos.length,nSan:n2,elementos:elementos,fatores:FATS,saneadaEl:saneadaEl,saneada:saneada,removidos:removidos,
     X:X,S:S,VC:VC,tc:tc,Li:Li,Ls:Ls,campoLi:campoLi,campoLs:campoLs,dentroCampo:dentroCampo,
     unitCampo:unitCampo,unitM2:unitCampo,unitHa:unitHa,areaHa:areaHa,valorMercado:vM,valorLiquidez:vL,fatorLiq:fl};
 }
@@ -2146,16 +2190,19 @@ function gerarLaudoWord(id){
   (a.amostra||[]).forEach(function(e,i){ var unit=(num(e.valor)&&num(e.areaM2))?(num(e.valor)/num(e.areaM2)):null;
     h+=P('<b>IMÓVEL '+(i+1<10?"0":"")+(i+1)+'</b><br>'+esc(e.descricao||"")+'<br>Área: '+esc(e.areaM2||"—")+' m²  ·  Valor: '+(num(e.valor)!=null?fmtBR(num(e.valor)):esc(e.valor||"—"))+(unit?('  ·  Unitário: '+fmtBR(unit)+'/m²'):'')+(e.fonte?('  ·  Fonte: '+esc(e.fonte)):'')+(e.link?('<br>Link: '+esc(e.link)):'')); });
   h+=P('<b>4.2)</b> Homogeneização: '+esc(a.homogeneizacao||""));
-  // ---- caracterização do avaliando + justificativa automática dos fatores ----
-  var av=a.avaliando||{}; var jL=fatItem(FAT_LOC,av.loc), jA=fatItem(FAT_ACESSO,av.acesso), jT=fatItem(FAT_TOPO,av.topo);
-  h+=P('<b>4.3)</b> Caracterização do imóvel avaliando (paradigma): '+esc(jL.j)+'; '+esc(jA.j)+'; '+esc(jT.j)+'. Os coeficientes adotados são: localização '+fmt2(jL.c)+', acesso '+fmt2(jA.c)+' e topografia '+fmt2(jT.c)+'.');
+  // ---- caracterização do avaliando + justificativa automática dos fatores (dinâmico) ----
+  var av=a.avaliando||{}; var FATw=(c.fatores&&c.fatores.length)?c.fatores:fatoresAtivos();
+  var carac=FATw.map(function(f){ return esc(fatOpc(f,av[f.id]).j||''); }).filter(function(x){return x;}).join('; ');
+  var coefs=FATw.map(function(f){ return esc(f.nome.toLowerCase())+' '+fmt2(fatOpc(f,av[f.id]).c); }).join(', ');
+  h+=P('<b>4.3)</b> Caracterização do imóvel avaliando (paradigma): '+carac+'. Os coeficientes adotados são: '+coefs+'.');
   // ---- Seção 5: tratamento estatístico (só quando há cálculo) ----
   if(c.unitM2!=null){
+    var siglas=FATw.map(function(f){ return esc(f.sigla||f.nome)+' ('+esc(f.nome.toLowerCase())+')'; }).join(', ');
     h+='<h2>5) Tratamento estatístico (Teoria das Pequenas Amostras — NBR-14653)</h2>';
-    h+=P('Os valores unitários foram homogeneizados pelos fatores F1 (localização), F2 (acesso) e F3 (topografia), obtidos pela razão entre o coeficiente do imóvel avaliando e o do respectivo elemento, limitada ao intervalo de 0,40 a 2,50.');
-    h+='<table><tr><th>Elemento</th><th>Unitário bruto (R$/m²)</th><th>F1</th><th>F2</th><th>F3</th><th>Homogeneizado Xi (R$/m²)</th><th>Chauvenet</th></tr>';
+    h+=P('Os valores unitários foram homogeneizados pelos fatores '+siglas+', obtidos pela razão entre o coeficiente do imóvel avaliando e o do respectivo elemento, limitada ao intervalo de 0,40 a 2,50.');
+    h+='<table><tr><th>Elemento</th><th>Unitário bruto (R$/m²)</th>'+FATw.map(function(f){return '<th>'+esc(f.sigla||f.nome)+'</th>';}).join("")+'<th>Homogeneizado Xi (R$/m²)</th><th>Chauvenet</th></tr>';
     (c.elementos||[]).forEach(function(el,i){ if(el.raw==null)return;
-      h+='<tr><td>IMÓVEL '+(i+1<10?"0":"")+(i+1)+'</td><td>'+fmt2(el.raw)+'</td><td>'+fmt2(el.f1)+'</td><td>'+fmt2(el.f2)+'</td><td>'+fmt2(el.f3)+'</td><td>'+fmt2(el.xi)+'</td><td>'+(el.ok?'pertinente':'excluída')+'</td></tr>'; });
+      h+='<tr><td>IMÓVEL '+(i+1<10?"0":"")+(i+1)+'</td><td>'+fmt2(el.raw)+'</td>'+FATw.map(function(f){return '<td>'+fmt2(el.fatores&&el.fatores[f.id])+'</td>';}).join("")+'<td>'+fmt2(el.xi)+'</td><td>'+(el.ok?'pertinente':'excluída')+'</td></tr>'; });
     h+='</table>';
     h+=P('<b>5.1) Média (X):</b> '+fmt2(c.X)+' R$/m². <b>Desvio padrão (S):</b> '+fmt2(c.S)+'.');
     h+=P('<b>5.2) Critério de Chauvenet:</b> para '+c.nSan+' elementos, o valor crítico é VC = '+fmt2(c.VC)+'. Considera-se pertinente o elemento cujo quociente d = |Xi − X| / S seja inferior a VC.'+(c.removidos.length?(' Foram excluídos '+c.removidos.length+' elemento(s) por não atenderem ao critério.'):' Todos os elementos foram considerados pertinentes.'));
