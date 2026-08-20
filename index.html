@@ -507,7 +507,7 @@ function topbarHtml(){
 // "compromissos" (agendamentos) fica disponível a TODOS os papéis (via wrapper abaixo).
 function modulosDoPapel(papel){ var b=_modBase(papel); if(b.indexOf("compromissos")<0) b=b.concat(["compromissos"]); if(b.indexOf("docsprod")<0) b=b.concat(["docsprod"]); return b; }
 function _modBase(papel){
-  if(papel==="master") return ["crm","diag","novo","solic","parceiros","campo","rede","mercado","servicos","fila","proj","master"];
+  if(papel==="master") return ["crm","diag","novo","solic","parceiros","campo","rede","mercado","servicos","fila","proj","geradordocs","master"];
   if(papel==="atendente"||papel==="gestor") return ["crm","diag","novo","solic","parceiros","campo","rede","mercado","servicos"];
   if(papel==="juridico") return ["crm","diag"];
   if(papel==="engenheiro") return ["crm","fila","campo"];
@@ -522,7 +522,7 @@ function _modBase(papel){
 // companheiros de "novo" seguem o módulo-pai
 var MOD_PAI={novo:"diag",novoproj:"proj",novoagro:"agro",novoclass:"mercado",novoparc:"parceiros"};
 // TODOS os módulos que o Master pode conceder a QUALQUER usuário (exclui companheiros novo* e o painel Master)
-var TODOS_MODULOS=["crm","diag","fila","proj","agro","solic","portal","solicitar","parceiros","campo","vistoria","rede","compromissos","docsprod","mercado","servicos"];
+var TODOS_MODULOS=["crm","diag","fila","proj","agro","solic","portal","solicitar","parceiros","campo","vistoria","geradordocs","rede","compromissos","docsprod","mercado","servicos"];
 function modulosSelecionaveis(papel){ return TODOS_MODULOS.slice(); }
 // menu efetivo: se o Master configurou u.modulos, vale EXATAMENTE isso (qualquer módulo, independente do papel);
 // sem configuração, cai no padrão do papel.
@@ -549,6 +549,7 @@ var NAVLBL={crm:{i:"🗂️",l:"CRM / Funil"},diag:{i:"📋",l:"Diagnósticos"},
   parceiros:{i:"🤝",l:"Parceiros"},novoparc:{i:"➕",l:"Novo serviço"},
   campo:{i:"🚜",l:"Serviços de Campo"},
   vistoria:{i:"📐",l:"Vistorias (PTAM)"},
+  geradordocs:{i:"📄",l:"Gerador de Documentos"},
   compromissos:{i:"📆",l:"Agendamentos"},
   docsprod:{i:"📄",l:"Documentos"},
   rede:{i:"🕸️",l:"Rede de Dados"},
@@ -576,6 +577,7 @@ var MODINFO={
   campo:{g:'OPERAÇÃO DE CAMPO',t:'Serviços de Campo',s:'Ordens de campo, andamento (CRM), agenda e entregas do parceiro terceirizado'},
   novocampo:{g:'OPERAÇÃO DE CAMPO',t:'Nova Ordem de Campo',s:'Designe o parceiro, agende a data e anexe os documentos auxiliares'},
   vistoria:{g:'AVALIAÇÃO (PTAM)',t:'Vistorias',s:'Preencha os dados do imóvel, coordenadas, a pesquisa de mercado e as fotos — o escritório faz o tratamento e a análise final'},
+  geradordocs:{g:'DOCUMENTAÇÃO',t:'Gerador de Documentos',s:'Gera documentos técnicos (usucapião, IN-09/2021 e outros) em Word, prontos para revisar e assinar'},
   compromissos:{g:'AGENDA',t:'Agendamentos',s:'Solicite reuniões com outros usuários ou com o escritório; aceite ou sugira nova data'},
   docsprod:{g:'DOCUMENTOS',t:'Documentos',s:'Envie ou solicite documentos entre quaisquer usuários; baixe e/ou guarde no cofre'},
   novocomprom:{g:'AGENDA',t:'Solicitar Agendamento',s:'Escolha com quem, a data e o assunto'},
@@ -616,6 +618,7 @@ function renderMain(){
   else if(view==="novoaval"){ if(!editAval) editAval=novoAval(); html=avalFormHtml(); }
   else if(view==="vistoria") html=vistoriaListaHtml();
   else if(view==="novovist"){ if(!editAval) editAval=novoAval(); html=avalFormHtml(); }
+  else if(view==="geradordocs") html=geradorDocsHtml();
   else if(view==="docsprod") html=docsprodHtml();
   else if(view==="compromissos") html=compromissosHtml();
   else if(view==="novocomprom"){ if(!editComprom) editComprom=novoComprom(); html=compromFormHtml(); }
@@ -1935,6 +1938,13 @@ function vistoriaListaHtml(){
 function novaVistoria(){ editAval=novoAval(); avalFormTab="dados"; modoVist=true; view="novovist"; render(); }
 function editarVistoria(id){ var a=avalById(id); if(!a)return; editAval=JSON.parse(JSON.stringify(a)); if(!editAval.fotos)editAval.fotos=[]; editAval._novo=false; avalFormTab="dados"; modoVist=true; view="novovist"; render(); }
 function voltarVistoria(){ modoVist=false; view="vistoria"; render(); }
+/* ---- Módulo Gerador de Documentos (página separada, liberável por usuário) ---- */
+function geradorDocsHtml(){
+  return '<div class="card" style="padding:0;overflow:hidden">'+
+    '<div class="row" style="justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line,#d8e1ef)"><b>📄 Gerador de Documentos Técnicos</b><a class="btn sm sec" href="gerador.html" target="_blank" rel="noopener">Abrir em nova aba ↗</a></div>'+
+    '<iframe src="gerador.html" title="Gerador de Documentos" style="width:100%;height:calc(100vh - 200px);min-height:560px;border:0;display:block"></iframe>'+
+  '</div>';
+}
 function setAval(path,val){ setPath(editAval,path,val); }
 function setAvalTab(t){ avalFormTab=t; renderMain(); }
 function inpAv(label,path,val){ return '<div><label class="f">'+label+'</label><input type="text" value="'+esc(val)+'" oninput="setAval(\''+path+'\',this.value)"></div>'; }
