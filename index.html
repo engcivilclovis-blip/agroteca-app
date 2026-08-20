@@ -522,7 +522,7 @@ function _modBase(papel){
 // companheiros de "novo" seguem o módulo-pai
 var MOD_PAI={novo:"diag",novoproj:"proj",novoagro:"agro",novoclass:"mercado",novoparc:"parceiros"};
 // TODOS os módulos que o Master pode conceder a QUALQUER usuário (exclui companheiros novo* e o painel Master)
-var TODOS_MODULOS=["crm","diag","fila","proj","agro","solic","portal","solicitar","parceiros","campo","rede","compromissos","docsprod","mercado","servicos"];
+var TODOS_MODULOS=["crm","diag","fila","proj","agro","solic","portal","solicitar","parceiros","campo","vistoria","rede","compromissos","docsprod","mercado","servicos"];
 function modulosSelecionaveis(papel){ return TODOS_MODULOS.slice(); }
 // menu efetivo: se o Master configurou u.modulos, vale EXATAMENTE isso (qualquer módulo, independente do papel);
 // sem configuração, cai no padrão do papel.
@@ -548,6 +548,7 @@ var NAVLBL={crm:{i:"🗂️",l:"CRM / Funil"},diag:{i:"📋",l:"Diagnósticos"},
   solic:{i:"📨",l:"Solicitações"},portal:{i:"🏡",l:"Minha propriedade"},solicitar:{i:"🛒",l:"Pedir serviço"},
   parceiros:{i:"🤝",l:"Parceiros"},novoparc:{i:"➕",l:"Novo serviço"},
   campo:{i:"🚜",l:"Serviços de Campo"},
+  vistoria:{i:"📐",l:"Vistorias (PTAM)"},
   compromissos:{i:"📆",l:"Agendamentos"},
   docsprod:{i:"📄",l:"Documentos"},
   rede:{i:"🕸️",l:"Rede de Dados"},
@@ -574,6 +575,7 @@ var MODINFO={
   parceiros:{g:'PARCERIAS',t:'Serviços de Parceiros',s:'Receba serviços, atualize o andamento e entregue os trabalhos prontos'},
   campo:{g:'OPERAÇÃO DE CAMPO',t:'Serviços de Campo',s:'Ordens de campo, andamento (CRM), agenda e entregas do parceiro terceirizado'},
   novocampo:{g:'OPERAÇÃO DE CAMPO',t:'Nova Ordem de Campo',s:'Designe o parceiro, agende a data e anexe os documentos auxiliares'},
+  vistoria:{g:'AVALIAÇÃO (PTAM)',t:'Vistorias',s:'Preencha os dados do imóvel, coordenadas, a pesquisa de mercado e as fotos — o escritório faz o tratamento e a análise final'},
   compromissos:{g:'AGENDA',t:'Agendamentos',s:'Solicite reuniões com outros usuários ou com o escritório; aceite ou sugira nova data'},
   docsprod:{g:'DOCUMENTOS',t:'Documentos',s:'Envie ou solicite documentos entre quaisquer usuários; baixe e/ou guarde no cofre'},
   novocomprom:{g:'AGENDA',t:'Solicitar Agendamento',s:'Escolha com quem, a data e o assunto'},
@@ -590,6 +592,7 @@ function renderMain(){
   // guardião: telas restritas ao Master (defesa no cliente; o servidor também bloqueia os dados/ações)
   if(view==="master" && !ehMaster()){ view=(navFor(user)[0]||"crm"); }
   if(view==="novoaval" && !ehMaster()){ view="campo"; campoTab="crm"; }
+  if((view==="vistoria"||view==="novovist") && !podeVistoriar()){ view=(navFor(user)[0]||"crm"); }
   if(view==="crm") html=crmHtml();
   else if(view==="diag") html=listaHtml();
   else if(view==="novo"){ if(!edit) edit=novoDiag(); html=formHtml(); }
@@ -611,6 +614,8 @@ function renderMain(){
   else if(view==="novocampo"){ if(!editCampo) editCampo=novoCampo(); html=campoFormHtml(); }
   else if(view==="vercampo") html=campoVerHtml();
   else if(view==="novoaval"){ if(!editAval) editAval=novoAval(); html=avalFormHtml(); }
+  else if(view==="vistoria") html=vistoriaListaHtml();
+  else if(view==="novovist"){ if(!editAval) editAval=novoAval(); html=avalFormHtml(); }
   else if(view==="docsprod") html=docsprodHtml();
   else if(view==="compromissos") html=compromissosHtml();
   else if(view==="novocomprom"){ if(!editComprom) editComprom=novoComprom(); html=compromFormHtml(); }
@@ -1911,19 +1916,39 @@ function avalListaHtml(){
   }).join(""):'<div class="card muted">Nenhuma avaliação ainda.</div>';
   return h;
 }
-function novaAval(){ editAval=novoAval(); avalFormTab="dados"; view="novoaval"; render(); }
-function editarAval(id){ var a=avalById(id); editAval=JSON.parse(JSON.stringify(a)); if(!editAval.fotos)editAval.fotos=[]; editAval._novo=false; avalFormTab="dados"; view="novoaval"; render(); }
+function novaAval(){ editAval=novoAval(); avalFormTab="dados"; modoVist=false; view="novoaval"; render(); }
+function editarAval(id){ var a=avalById(id); editAval=JSON.parse(JSON.stringify(a)); if(!editAval.fotos)editAval.fotos=[]; editAval._novo=false; avalFormTab="dados"; modoVist=false; view="novoaval"; render(); }
+/* ---- acesso do VISTORIADOR (ex.: Vagner): vistoria + pesquisa; escritório faz tratamento e análise final ---- */
+var modoVist=false;
+function podeVistoriar(){ return ehMaster() || (user && user.modulos && user.modulos.indexOf('vistoria')>-1); }
+function vistoriaListaHtml(){
+  ensureFatores();
+  var lista=avaliacoes.filter(function(a){return (ehMaster()||eqNome(a.vistoriador,user.nome))&&!a.arquivado;}).sort(function(a,b){return (b.criadoEm||"").localeCompare(a.criadoEm||"");});
+  var h='<div class="row" style="justify-content:flex-end;margin-bottom:8px"><button class="btn" onclick="novaVistoria()">➕ Nova vistoria</button></div>';
+  h+='<div class="banner info">📐 Preencha os <b>dados do imóvel</b>, as <b>coordenadas</b>, a <b>pesquisa de mercado</b> (imóveis comparativos) e as <b>fotos</b>. Ao salvar, tudo vai para o escritório, que faz o tratamento estatístico e a <b>análise final</b>.</div>';
+  h+=lista.length?lista.map(function(a){
+    return '<div class="list-item" onclick="editarVistoria(\''+a.id+'\')"><div class="t"><b>'+esc(a.imovel.proprietario||a.solicitante||"(vistoria)")+'</b> '+campoPill(a.status)+
+      '<div>'+esc(a.imovel.municipioUf||"—")+' · '+((a.amostra||[]).length)+' comparativo(s) · '+((a.fotos||[]).length)+' foto(s) · '+brData(a.criadoEm)+'</div></div><span class="muted">›</span></div>';
+  }).join(""):'<div class="card muted">Nenhuma vistoria ainda.</div>';
+  return h;
+}
+function novaVistoria(){ editAval=novoAval(); avalFormTab="dados"; modoVist=true; view="novovist"; render(); }
+function editarVistoria(id){ var a=avalById(id); if(!a)return; editAval=JSON.parse(JSON.stringify(a)); if(!editAval.fotos)editAval.fotos=[]; editAval._novo=false; avalFormTab="dados"; modoVist=true; view="novovist"; render(); }
+function voltarVistoria(){ modoVist=false; view="vistoria"; render(); }
 function setAval(path,val){ setPath(editAval,path,val); }
 function setAvalTab(t){ avalFormTab=t; renderMain(); }
 function inpAv(label,path,val){ return '<div><label class="f">'+label+'</label><input type="text" value="'+esc(val)+'" oninput="setAval(\''+path+'\',this.value)"></div>'; }
 function txtAv(label,path,val){ return '<div style="margin-top:8px"><label class="f">'+label+'</label><textarea oninput="setAval(\''+path+'\',this.value)">'+esc(val)+'</textarea></div>'; }
 function avalFormHtml(){
   var a=editAval;
+  var TABS = modoVist
+    ? [['dados','📋 Dados do imóvel'],['pesquisa','💹 Pesquisa de mercado'],['fotos','📸 Fotos']]
+    : [['dados','📋 Dados do imóvel'],['pesquisa','💹 Pesquisa de mercado'],['ressarc','💰 Ressarcimento'],['fotos','📸 Fotos'],['gerar','📄 Gerar laudo']];
+  if(!TABS.some(function(t){return t[0]===avalFormTab;})) avalFormTab="dados";
   var tabs='<div class="row" style="gap:6px;flex-wrap:wrap;margin:10px 0">'+
-    [['dados','📋 Dados do imóvel'],['pesquisa','💹 Pesquisa de mercado'],['ressarc','💰 Ressarcimento'],['fotos','📸 Fotos'],['gerar','📄 Gerar laudo']].map(function(t){
-      return '<button class="btn sm '+(avalFormTab===t[0]?"":"sec")+'" onclick="setAvalTab(\''+t[0]+'\')">'+t[1]+'</button>';}).join("")+'</div>';
-  var head='<div class="row" style="justify-content:space-between"><h1>'+(a._novo?"Nova":"Editar")+' avaliação (PTAM)</h1>'+
-    '<div class="row"><button class="btn sec" onclick="voltarAval()">Voltar</button><button class="btn" onclick="salvarAvalAcao()">💾 Salvar</button></div></div>';
+    TABS.map(function(t){ return '<button class="btn sm '+(avalFormTab===t[0]?"":"sec")+'" onclick="setAvalTab(\''+t[0]+'\')">'+t[1]+'</button>';}).join("")+'</div>';
+  var head='<div class="row" style="justify-content:space-between"><h1>'+(modoVist?(a._novo?"Nova vistoria":"Editar vistoria"):(a._novo?"Nova":"Editar")+' avaliação (PTAM)')+'</h1>'+
+    '<div class="row"><button class="btn sec" onclick="'+(modoVist?'voltarVistoria()':'voltarAval()')+'">Voltar</button><button class="btn" onclick="salvarAvalAcao()">💾 Salvar</button></div></div>';
   var body="";
   if(avalFormTab==="dados") body=avalDadosHtml(a);
   else if(avalFormTab==="pesquisa") body=avalPesquisaHtml(a);
@@ -2065,7 +2090,7 @@ function avalPesquisaHtml(a){
   var c=calcAval(a); var av=a.avaliando||{}; var FATS=fatoresAtivos();
   function selFatObj(scope,f,val){ var oc=(scope==="av")?("setAval('avaliando."+f.id+"',this.value);renderMain()"):("setAmostra("+scope+",'"+f.id+"',this.value);renderMain()");
     return '<select onchange="'+oc+'" style="width:100%;padding:7px;border:1px solid #cfd8e3;border-radius:8px;background:#fff">'+f.opcoes.map(function(o){return '<option value="'+esc(o.k)+'"'+(val===o.k?' selected':'')+'>'+esc(o.l)+' — '+Number(o.c).toFixed(2)+'</option>';}).join("")+'</select>'; }
-  var h='<div class="card"><div class="row" style="justify-content:space-between;align-items:center;gap:8px"><h2 style="margin:0">🎯 Características do imóvel avaliando</h2><button class="btn sm sec" onclick="toggleCfgFatores()">⚙️ Configurar fatores</button></div>'+
+  var h='<div class="card"><div class="row" style="justify-content:space-between;align-items:center;gap:8px"><h2 style="margin:0">🎯 Características do imóvel avaliando</h2>'+(modoVist?'':'<button class="btn sm sec" onclick="toggleCfgFatores()">⚙️ Configurar fatores</button>')+'</div>'+
     '<p class="muted small" style="margin-top:6px">Cada fator do elemento = coeficiente do avaliando ÷ coeficiente do elemento (limitado a 0,40–2,50), conforme a NBR-14653. Use “Configurar fatores” para acrescentar novos critérios (ex.: aproveitamento, recursos hídricos) — inclusive os futuros fatores urbanos.</p>'+
     (ptamCfgFatores?cfgFatoresHtml():'')+
     '<div class="grid g3" style="margin-top:6px">'+FATS.map(function(f){ return '<div><label class="f">'+esc(f.nome)+(f.sigla?(' ('+esc(f.sigla)+')'):'')+'</label>'+selFatObj("av",f,av[f.id])+'</div>'; }).join("")+'</div></div>';
@@ -2106,10 +2131,14 @@ function avalPesquisaHtml(a){
        '<div class="kv"><span><b>Valor de mercado sugerido</b></span><span><b>'+fmtBR(c.valorMercado)+'</b></span></div>'+
        '<div class="grid g2" style="margin-top:8px">'+inpAv("Fator de liquidez (ex.: 0,95)","calc.fatorLiquidez",a.calc.fatorLiquidez)+'<div class="kv"><span>Liquidez sugerida</span><span>'+fmtBR(c.valorLiquidez)+'</span></div></div>';
   }
-  h+='<div class="divider" style="margin:10px 0"></div><div class="grid g2">'+
-     inpAv("✅ Valor de mercado FINAL (confirmar)","valorMercado",a.valorMercado||(c.valorMercado!=null?fmtBR(c.valorMercado):""))+
-     inpAv("✅ Valor de liquidez FINAL (confirmar)","valorLiquidez",a.valorLiquidez||(c.valorLiquidez!=null?fmtBR(c.valorLiquidez):""))+'</div>'+
-     '<p class="muted small" style="margin-top:6px">O valor final é seu — o cálculo é uma sugestão. Ajuste conforme sua análise técnica.</p></div>';
+  if(modoVist){
+    h+='<div class="divider" style="margin:10px 0"></div><div class="banner info" style="margin:0">🔒 O <b>tratamento estatístico</b> e a <b>definição do valor final</b> são feitos pelo escritório. Aqui você monta a pesquisa (imóveis comparativos) e confere a prévia acima.</div></div>';
+  } else {
+    h+='<div class="divider" style="margin:10px 0"></div><div class="grid g2">'+
+       inpAv("✅ Valor de mercado FINAL (confirmar)","valorMercado",a.valorMercado||(c.valorMercado!=null?fmtBR(c.valorMercado):""))+
+       inpAv("✅ Valor de liquidez FINAL (confirmar)","valorLiquidez",a.valorLiquidez||(c.valorLiquidez!=null?fmtBR(c.valorLiquidez):""))+'</div>'+
+       '<p class="muted small" style="margin-top:6px">O valor final é seu — o cálculo é uma sugestão. Ajuste conforme sua análise técnica.</p></div>';
+  }
   return h;
 }
 function addAmostra(){ if(!editAval.amostra)editAval.amostra=[]; editAval.amostra.push({descricao:"",fonte:"",areaM2:"",valor:"",link:"",topo:"plana",acesso:"pav",loc:"privileg"}); renderMain(); }
@@ -2223,11 +2252,11 @@ function calcAval(a){
 }
 function avalFotosHtml(a){
   var h='<div class="card"><h2>📸 Fotos da vistoria ('+(a.fotos||[]).length+')</h2>'+
-    '<div class="banner info">Bata a foto pela câmera ou escolha da pasta. Se o aparelho permitir, o GPS é carimbado na legenda. As fotos entram no Relatório Fotográfico e <b>não sobem para a nuvem</b> (ficam nesta sessão).</div>'+
+    '<div class="banner info">Bata a foto pela câmera ou escolha da pasta. Se o aparelho permitir, o GPS é carimbado na legenda. Ao <b>Salvar</b>, as fotos <b>sobem para a nuvem</b> e ficam disponíveis para o escritório montar o relatório.</div>'+
     '<div class="row" style="gap:8px;flex-wrap:wrap;margin:10px 0"><button class="btn" onclick="addFotoAval(true)">📷 Bater foto (câmera)</button><button class="btn sec" onclick="addFotoAval(false)">📁 Escolher da pasta</button></div>';
   h+=(a.fotos||[]).length?('<div class="grid g2">'+a.fotos.map(function(f,i){
-    return '<div class="card" style="margin:0"><div class="row" style="justify-content:space-between"><b>Foto '+(i+1)+'</b><button class="btn sm sec" onclick="delFotoAval('+i+')">✕</button></div>'+
-      (f.dataURI?'<img src="'+f.dataURI+'" style="width:100%;border-radius:8px;margin:6px 0">':'<div class="muted small" style="margin:6px 0">(imagem não está nesta sessão — re-adicione para gerar)</div>')+
+    return '<div class="card" style="margin:0"><div class="row" style="justify-content:space-between"><b>Foto '+(i+1)+'</b>'+(f.link?'<span class="muted small">☁️ na nuvem</span>':'')+'<button class="btn sm sec" onclick="delFotoAval('+i+')">✕</button></div>'+
+      ((f.dataURI||f.link)?'<img src="'+(f.dataURI||f.link)+'" style="width:100%;border-radius:8px;margin:6px 0">':'<div class="muted small" style="margin:6px 0">(imagem não está nesta sessão — re-adicione para gerar)</div>')+
       (f.gps?'<div class="muted small">📍 '+esc(f.gps)+'</div>':'')+
       '<label class="f" style="margin-top:6px">Legenda</label><input value="'+esc(f.legenda)+'" oninput="setFotoLeg('+i+',this.value)" placeholder="Ex.: Vista externa - Casa principal"></div>';
   }).join("")+'</div>'):'<div class="muted small">Nenhuma foto.</div>';
@@ -2259,14 +2288,30 @@ function avalGerarHtml(a){
       '<select onchange="setAval(\'status\',this.value)" style="padding:6px">'+AVAL_STATUS.map(function(s){return '<option '+(a.status===s?"selected":"")+'>'+s+'</option>';}).join("")+'</select>'+
       '<button class="btn sm sec" onclick="salvarAvalAcao(true)">💾 Salvar status</button></div></div>';
 }
+// dataURI -> File (p/ upload ao Drive)
+function dataURItoFile(uri,nome){ var p=String(uri).split(','); var mime=(p[0].match(/:(.*?);/)||[])[1]||'image/jpeg'; var bin=atob(p[1]); var n=bin.length,u8=new Uint8Array(n); for(var i=0;i<n;i++)u8[i]=bin.charCodeAt(i);
+  try{ return new File([u8],nome||'foto.jpg',{type:mime}); }catch(e){ var b=new Blob([u8],{type:mime}); b.name=nome||'foto.jpg'; return b; } }
+// upload silencioso ao Drive (sempre chama cb, mesmo em falha)
+function subirFotoDrive(file,cb){ if(!file||file.size>12*1024*1024){ cb(null); return; }
+  var rd=new FileReader(); rd.onload=function(){ apiPost('uploadArquivo',{nome:file.name,base64:String(rd.result),mime:file.type||'image/jpeg'}).then(function(r){ cb(r&&r.url?r.url:null); }).catch(function(){ cb(null); }); };
+  rd.onerror=function(){ cb(null); }; rd.readAsDataURL(file); }
+// sobe as fotos ainda sem link (para o escritório enxergar as fotos do vistoriador)
+function subirFotosPendentes(fotos,cb){ var pend=(fotos||[]).filter(function(f){return f.dataURI&&!f.link;}); if(!pend.length){ cb(0); return; }
+  var i=0,ok=0; (function prox(){ if(i>=pend.length){ cb(ok); return; } var f=pend[i++]; subirFotoDrive(dataURItoFile(f.dataURI,f.nome||('foto'+i+'.jpg')),function(url){ if(url){ f.link=url; ok++; } prox(); }); })(); }
 function salvarAvalAcao(silent){
   if(!(editAval.imovel.proprietario||editAval.solicitante||"").trim()){ alert("Informe ao menos o proprietário ou o solicitante."); return; }
-  // cópia p/ nuvem SEM as imagens (só metadados das fotos)
+  if(modoVist && editAval.status==="Em vistoria") editAval.status="Pesquisa de mercado";
+  var pend=(editAval.fotos||[]).filter(function(f){return f.dataURI&&!f.link;});
+  if(pend.length && !silent){ var av=document.getElementById('avalSalvarBtn'); }
+  subirFotosPendentes(editAval.fotos, function(nOk){ _persistirAval(silent, pend.length, nOk); });
+}
+function _persistirAval(silent, nPend, nOk){
   var i=avaliacoes.findIndex(function(x){return x.id===editAval.id;});
   if(i>-1)avaliacoes[i]=editAval; else avaliacoes.push(editAval);
-  var doc=JSON.parse(JSON.stringify(editAval)); doc.fotos=(doc.fotos||[]).map(function(f){return {nome:f.nome,legenda:f.legenda,gps:f.gps,quando:f.quando};});
+  // nuvem: guarda metadados + LINK do Drive (não a imagem base64)
+  var doc=JSON.parse(JSON.stringify(editAval)); doc.fotos=(doc.fotos||[]).map(function(f){return {nome:f.nome,legenda:f.legenda,gps:f.gps,quando:f.quando,link:f.link||""};});
   apiSalvarDoc('avaliacoes',doc); editAval._novo=false;
-  if(!silent){ alert("Avaliação salva. (As fotos ficam só nesta sessão para gerar os Word.)"); }
+  if(!silent){ var extra=nPend?(nOk===nPend?(' '+nOk+' foto(s) enviada(s) à nuvem.'):(' '+nOk+'/'+nPend+' foto(s) enviada(s) — as demais tente novamente.')):''; alert((modoVist?"Vistoria enviada ao escritório.":"Avaliação salva.")+extra); }
   else { alert("Status salvo."); }
   renderMain();
 }
@@ -4677,8 +4722,8 @@ function _laudoWord(a, croquiImg){
 }
 function gerarRelatorioFotoWord(id){
   var a=avalById(id)||editAval;
-  var comImg=(a.fotos||[]).filter(function(f){return f.dataURI;});
-  if(!comImg.length){ alert("Adicione fotos nesta sessão (aba Fotos) antes de gerar o relatório."); return; }
+  var comImg=(a.fotos||[]).filter(function(f){return f.dataURI||f.link;});
+  if(!comImg.length){ alert("Adicione fotos (aba Fotos) antes de gerar o relatório."); return; }
   var im=a.imovel||{};
   var h='<h1>RELATÓRIO FOTOGRÁFICO</h1>';
   h+='<table style="margin-bottom:8pt"><tr><td style="border:none;padding:2px"><b>Proprietário:</b> '+esc(im.proprietario||"—")+'</td><td style="border:none;padding:2px"><b>Matrícula:</b> '+esc(im.matricula||"—")+'</td></tr>'+
@@ -4686,7 +4731,7 @@ function gerarRelatorioFotoWord(id){
   comImg.forEach(function(f,i){
     h+='<div style="page-break-inside:avoid;text-align:center;margin:0 0 12pt">'+
        '<div style="font-weight:bold;font-size:10pt;margin-bottom:2pt">Foto '+(i+1)+'</div>'+
-       '<img src="'+f.dataURI+'" style="width:440px;max-width:100%;border:1px solid #000">'+
+       '<img src="'+(f.dataURI||f.link)+'" style="width:440px;max-width:100%;border:1px solid #000">'+
        '<div style="font-size:9pt;color:#333;margin-top:3pt">'+esc(f.legenda||"")+(f.gps?(' &nbsp;·&nbsp; 📍 '+esc(f.gps)):'')+'</div>'+
        '</div>';
     if((i+1)%2===0 && i<comImg.length-1) h+='<div style="page-break-after:always"></div>';
