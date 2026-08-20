@@ -1951,7 +1951,8 @@ function avalDadosHtml(a){
       '<div class="row" style="gap:8px;flex-wrap:wrap;margin:6px 0"><button class="btn sm" onclick="importarCoords()">📥 Importar e converter</button>'+((a.coordenadas||[]).length?'<button class="btn sm sec" onclick="limparCoords()">🗑 Limpar pontos</button>':'')+'</div>'+
       ((a.coordenadas||[]).length?'<div style="overflow-x:auto"><table style="width:100%;font-size:13px"><tr><th style="text-align:left">Código</th><th style="text-align:left">Longitude</th><th style="text-align:left">Latitude</th><th></th></tr>'+
         a.coordenadas.map(function(c,i){return '<tr><td><input value="'+esc(c.cod)+'" oninput="setCoord('+i+',\'cod\',this.value)" style="width:70px"></td><td><input value="'+esc(c.long)+'" oninput="setCoord('+i+',\'long\',this.value)"></td><td><input value="'+esc(c.lat)+'" oninput="setCoord('+i+',\'lat\',this.value)"></td><td><button class="btn sm sec" onclick="delCoord('+i+')">✕</button></td></tr>';}).join("")+'</table></div>':'<div class="muted small">Nenhuma coordenada.</div>')+
-      '<div style="height:8px"></div><button class="btn sm sec" onclick="addCoord()">➕ Adicionar ponto manual</button></div>'+
+      '<div style="height:8px"></div><button class="btn sm sec" onclick="addCoord()">➕ Adicionar ponto manual</button>'+
+      ((a.coordenadas||[]).length>=3?('<div style="margin-top:10px"><label class="f">Croqui do perímetro (prévia — entra no anexo do laudo)</label><div style="border:1px solid var(--line,#d8e1ef);border-radius:8px;overflow:hidden;max-width:340px;background:#fff">'+(croquiSVG(a.coordenadas,320)||'')+'</div></div>'):'<div class="muted small" style="margin-top:8px">Com 3+ pontos, o croqui do perímetro aparece aqui e vai para o anexo.</div>')+'</div>'+
     '<div class="card"><h2>Responsável técnico</h2><div class="grid g2">'+inpAv("Nome","responsavel.nome",a.responsavel.nome)+inpAv("CREA","responsavel.crea",a.responsavel.crea)+inpAv("CFT/CRT","responsavel.cft",a.responsavel.cft)+inpAv("Data do laudo","dataLaudo",a.dataLaudo)+'</div></div>';
 }
 function addCoord(){ if(!editAval.coordenadas)editAval.coordenadas=[]; editAval.coordenadas.push({cod:"P-"+(editAval.coordenadas.length+1),long:"",lat:""}); renderMain(); }
@@ -1988,6 +1989,33 @@ function importarCoords(){
   pts.forEach(function(p,i){ editAval.coordenadas.push({cod:'V-'+(base+i+1), long:decToDMS(p.lon,false), lat:decToDMS(p.lat,true)}); });
   renderMain(); setTimeout(function(){ alert(pts.length+' vértice(s) importado(s) e convertido(s) para GMS.'); },60);
 }
+/* ---- croqui do perímetro a partir das coordenadas ---- */
+function coordParaDec(str){ str=String(str||'').trim(); if(!str)return null;
+  var m=str.match(/(-?\d+(?:[.,]\d+)?)\s*[°º]\s*(\d+(?:[.,]\d+)?)?\s*['′’]?\s*([\d.,]+)?\s*["″”]?\s*([NSEWLO])?/i);
+  if(m&&(m[2]||m[4])) return _dmsToDec(m[1],m[2],m[3],m[4]);
+  var d=parseFloat(str.replace(',','.')); return isNaN(d)?null:d; }
+function croquiSVG(coords,px){
+  var pts=(coords||[]).map(function(c){ return {x:coordParaDec(c.long), y:coordParaDec(c.lat), cod:c.cod}; }).filter(function(p){return p.x!=null&&p.y!=null;});
+  if(pts.length<3) return null;
+  var W=px||500,H=px||500,pad=44;
+  var xs=pts.map(function(p){return p.x;}),ys=pts.map(function(p){return p.y;});
+  var minx=Math.min.apply(null,xs),maxx=Math.max.apply(null,xs),miny=Math.min.apply(null,ys),maxy=Math.max.apply(null,ys);
+  var dx=(maxx-minx)||1e-6,dy=(maxy-miny)||1e-6,sc=Math.min((W-2*pad)/dx,(H-2*pad)/dy);
+  var ox=(W-dx*sc)/2, oy=(H-dy*sc)/2;
+  function X(x){ return ox+(x-minx)*sc; } function Y(y){ return H-(oy+(y-miny)*sc); }
+  var poly=pts.map(function(p){return X(p.x).toFixed(1)+','+Y(p.y).toFixed(1);}).join(' ');
+  var s='<svg xmlns="http://www.w3.org/2000/svg" width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">';
+  s+='<rect width="'+W+'" height="'+H+'" fill="#ffffff"/>';
+  s+='<polygon points="'+poly+'" fill="rgba(29,78,216,0.10)" stroke="#0f2a63" stroke-width="2"/>';
+  pts.forEach(function(p){ var cx=X(p.x),cy=Y(p.y); s+='<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="3" fill="#b00020"/><text x="'+(cx+5).toFixed(1)+'" y="'+(cy-5).toFixed(1)+'" font-family="Arial" font-size="10" fill="#0f2a63">'+esc(p.cod||'')+'</text>'; });
+  s+='<g transform="translate('+(W-26)+',30)"><line x1="0" y1="14" x2="0" y2="-8" stroke="#000" stroke-width="1.5"/><polygon points="0,-13 -4,-5 4,-5" fill="#000"/><text x="0" y="27" font-family="Arial" font-size="10" text-anchor="middle">N</text></g>';
+  return s+'</svg>';
+}
+function croquiPNG(coords,cb){ var svg=croquiSVG(coords,560); if(!svg){ cb(null); return; }
+  var uri='data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(svg)));
+  var img=new Image();
+  img.onload=function(){ try{ var cv=document.createElement('canvas'); cv.width=560; cv.height=560; var ctx=cv.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,560,560); ctx.drawImage(img,0,0,560,560); cb(cv.toDataURL('image/png')); }catch(e){ cb(null); } };
+  img.onerror=function(){ cb(null); }; img.src=uri; }
 /* ---- tabela de ressarcimento (editável) ---- */
 function avalRessarcHtml(a){
   if(!a.ressarcimento) a.ressarcimento={itens:[],obs:""};
@@ -2274,7 +2302,12 @@ function baixarDocWord(nomeArq, interno){
   var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=nomeArq+".doc"; a.click();
 }
 function gerarLaudoWord(id){
-  var a=avalById(id)||editAval; var c=calcAval(a);
+  var a=avalById(id)||editAval;
+  if((a.coordenadas||[]).length>=3){ croquiPNG(a.coordenadas,function(png){ _laudoWord(a,png); }); }
+  else { _laudoWord(a,null); }
+}
+function _laudoWord(a, croquiImg){
+  var c=calcAval(a);
   var im=a.imovel;
   function P(t){ return '<p>'+t+'</p>'; }
   var h='<h1>PARECER TÉCNICO DE AVALIAÇÃO MERCADOLÓGICA (PTAM)</h1>';
@@ -2322,7 +2355,9 @@ function gerarLaudoWord(id){
   h+=P('Esta avaliação foi elaborada considerando o valor da terra nua'+(rTot>0?', com as benfeitorias discriminadas em tabela própria':'')+'.');
   h+=P((im.municipioUf||"São Joaquim, SC")+', '+brData(a.dataLaudo)+'.');
   h+='<div class="sig">_____________________________________________<br>'+esc(a.responsavel.nome||"")+'<br>'+esc(a.responsavel.crea||"")+(a.responsavel.cft?(' - '+esc(a.responsavel.cft)):'')+'</div>';
-  if((a.coordenadas||[]).length){ h+='<h2>ANEXO — COORDENADAS GEOGRÁFICAS</h2><table><tr><th>Código</th><th>Longitude</th><th>Latitude</th></tr>'+
+  if((a.coordenadas||[]).length){ h+='<h2>ANEXO — COORDENADAS GEOGRÁFICAS</h2>'+
+    (croquiImg?('<p style="text-align:center"><img src="'+croquiImg+'" style="width:440px;max-width:100%;border:1px solid #000"></p><p class="muted" style="text-align:center;font-size:9pt">Croqui esquemático do perímetro (vértices em coordenadas geodésicas; Norte para cima).</p>'):'')+
+    '<table><tr><th>Código</th><th>Longitude</th><th>Latitude</th></tr>'+
     a.coordenadas.map(function(cc){return '<tr><td>'+esc(cc.cod)+'</td><td>'+esc(cc.long)+'</td><td>'+esc(cc.lat)+'</td></tr>';}).join("")+'</table>'; }
   baixarDocWord("Laudo_PTAM_"+((im.proprietario||"imovel").replace(/[^a-z0-9]+/gi,"_")), h);
 }
