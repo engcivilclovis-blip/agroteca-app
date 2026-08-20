@@ -1943,7 +1943,7 @@ function avalFormHtml(){
   var a=editAval;
   var TABS = modoVist
     ? [['dados','📋 Dados do imóvel'],['pesquisa','💹 Pesquisa de mercado'],['fotos','📸 Fotos']]
-    : [['dados','📋 Dados do imóvel'],['pesquisa','💹 Pesquisa de mercado'],['ressarc','💰 Ressarcimento'],['fotos','📸 Fotos'],['gerar','📄 Gerar laudo']];
+    : [['dados','📋 Dados do imóvel'],['pesquisa','💹 Pesquisa de mercado'],['benf','🏗️ Benfeitorias'],['ressarc','💰 Ressarcimento'],['fotos','📸 Fotos'],['gerar','📄 Gerar laudo']];
   if(!TABS.some(function(t){return t[0]===avalFormTab;})) avalFormTab="dados";
   var tabs='<div class="row" style="gap:6px;flex-wrap:wrap;margin:10px 0">'+
     TABS.map(function(t){ return '<button class="btn sm '+(avalFormTab===t[0]?"":"sec")+'" onclick="setAvalTab(\''+t[0]+'\')">'+t[1]+'</button>';}).join("")+'</div>';
@@ -1952,6 +1952,7 @@ function avalFormHtml(){
   var body="";
   if(avalFormTab==="dados") body=avalDadosHtml(a);
   else if(avalFormTab==="pesquisa") body=avalPesquisaHtml(a);
+  else if(avalFormTab==="benf") body=avalBenfHtml(a);
   else if(avalFormTab==="ressarc") body=avalRessarcHtml(a);
   else if(avalFormTab==="fotos") body=avalFotosHtml(a);
   else body=avalGerarHtml(a);
@@ -2041,6 +2042,97 @@ function croquiPNG(coords,cb){ var svg=croquiSVG(coords,560); if(!svg){ cb(null)
   var img=new Image();
   img.onload=function(){ try{ var cv=document.createElement('canvas'); cv.width=560; cv.height=560; var ctx=cv.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,560,560); ctx.drawImage(img,0,0,560,560); cb(cv.toDataURL('image/png')); }catch(e){ cb(null); } };
   img.onerror=function(){ cb(null); }; img.src=uri; }
+/* ---- benfeitorias / edificações com depreciação (Ross-Heidecke + vida útil) ---- */
+var HEIDECKE=[
+ {k:'novo',l:'Novo',c:0.00},
+ {k:'novo_reg',l:'Entre novo e regular',c:0.0032},
+ {k:'regular',l:'Regular',c:0.0252},
+ {k:'reg_rep',l:'Entre regular e reparos simples',c:0.0809},
+ {k:'rep_simples',l:'Reparos simples',c:0.1810},
+ {k:'rep_simp_imp',l:'Entre reparos simples e importantes',c:0.3320},
+ {k:'rep_import',l:'Reparos importantes',c:0.5260},
+ {k:'imp_semv',l:'Entre reparos importantes e sem valor',c:0.7520},
+ {k:'sem_valor',l:'Sem valor / demolição',c:1.00}];
+function heidItem(k){ for(var i=0;i<HEIDECKE.length;i++){ if(HEIDECKE[i].k===k) return HEIDECKE[i]; } return HEIDECKE[0]; }
+function calcBenf(it){
+  var q=num(it.q)||0, vu=num(it.vu)||0, vn=q*vu; if(!vn && num(it.valorNovo)!=null) vn=num(it.valorNovo)||0;
+  var idade=num(it.idade)||0, vida=num(it.vida)||0;
+  if(it.tipo==='edificacao'){
+    var x=vida>0?Math.min(1,idade/vida):0, Kr=0.5*(x+x*x), ch=heidItem(it.estado).c, K=Kr+(1-Kr)*ch;
+    return {vn:vn, metodo:'Ross-Heidecke', Kr:Kr, ch:ch, K:K, vd:vn*(1-K)};
+  }
+  var rp=(num(it.residual)||0)/100, saldo=vida>0?Math.max(0,(vida-idade)/vida):1, fator=rp+(1-rp)*saldo;
+  return {vn:vn, metodo:'Vida útil (saldo)', saldo:saldo, K:1-fator, vd:vn*fator};
+}
+function benfTotal(a){ var t=0; ((a.benfeitorias&&a.benfeitorias.itens)||[]).forEach(function(it){ t+=calcBenf(it).vd; }); return t; }
+// consolidação: valor da terra (aba Pesquisa) + benfeitorias = valor de mercado final; liquidação forçada aplica redução %
+function valorTerra(a){ var v=num(a.valorMercado); if(v!=null) return v; var c=calcAval(a); return c.valorMercado||0; }
+function reducaoLiq(a){ var r=num(a.calc&&a.calc.reducaoLiquidez); return (r!=null&&r>=0)?r:0; }
+function valorFinalMercado(a){ return (valorTerra(a)||0)+benfTotal(a); }
+function valorLiquidacao(a){ return valorFinalMercado(a)*(1-reducaoLiq(a)/100); }
+var BENF_MODELOS=[
+ {tipo:'edificacao',desc:'Casa / sede (alvenaria)',vida:'60',estado:'regular'},
+ {tipo:'edificacao',desc:'Galpão / barracão',vida:'40',estado:'regular'},
+ {tipo:'cultura',desc:'Pomar de maçã (macieira)',vida:'20'},
+ {tipo:'cultura',desc:'Tela antigranizo (cobertura)',vida:'12'},
+ {tipo:'cultura',desc:'Sistema de irrigação',vida:'15'},
+ {tipo:'cultura',desc:'Cerca / curral',vida:'20'}];
+function avalBenfHtml(a){
+  if(!a.benfeitorias) a.benfeitorias={itens:[]};
+  var B=a.benfeitorias, tot=0;
+  var cards=(B.itens||[]).map(function(it,i){ var c=calcBenf(it); tot+=c.vd; var ed=(it.tipo==='edificacao');
+    var qLbl=ed?'Área (m²)':'Quantidade'; var vuLbl=ed?'Custo unit. a novo (R$/m²)':'Valor unit. a novo (R$)';
+    return '<div class="card" style="margin:0 0 8px;background:var(--surface2,#f7f9fc)">'+
+      '<div class="row" style="justify-content:space-between;align-items:center;gap:8px"><b>Benfeitoria '+(i+1)+'</b>'+
+        '<div class="row" style="gap:6px"><select onchange="setBenf('+i+',\'tipo\',this.value);renderMain()" style="padding:6px;border:1px solid #cfd8e3;border-radius:8px"><option value="edificacao"'+(ed?' selected':'')+'>Edificação (Ross-Heidecke)</option><option value="cultura"'+(!ed?' selected':'')+'>Cultura / cobertura (vida útil)</option></select>'+
+        '<button class="btn sm sec" onclick="delBenf('+i+')">✕</button></div></div>'+
+      '<div style="margin-top:6px"><label class="f">Descrição</label><input value="'+esc(it.desc)+'" oninput="setBenf('+i+',\'desc\',this.value)"></div>'+
+      '<div class="grid g3" style="margin-top:6px">'+
+        '<div><label class="f">'+qLbl+'</label><input value="'+esc(it.q)+'" oninput="setBenf('+i+',\'q\',this.value)" onchange="renderMain()"></div>'+
+        '<div><label class="f">'+vuLbl+'</label><input value="'+esc(it.vu)+'" oninput="setBenf('+i+',\'vu\',this.value)" onchange="renderMain()"></div>'+
+        '<div><label class="f">Valor a novo (R$)</label><input value="'+fmtBR(c.vn)+'" disabled style="background:#eef2f8"></div>'+
+      '</div>'+
+      '<div class="grid g3" style="margin-top:6px">'+
+        '<div><label class="f">Idade (anos)</label><input value="'+esc(it.idade)+'" oninput="setBenf('+i+',\'idade\',this.value)" onchange="renderMain()"></div>'+
+        '<div><label class="f">Vida útil (anos)</label><input value="'+esc(it.vida)+'" oninput="setBenf('+i+',\'vida\',this.value)" onchange="renderMain()"></div>'+
+        (ed?('<div><label class="f">Estado de conservação</label><select onchange="setBenf('+i+',\'estado\',this.value);renderMain()" style="width:100%;padding:7px;border:1px solid #cfd8e3;border-radius:8px;background:#fff">'+HEIDECKE.map(function(o){return '<option value="'+o.k+'"'+(it.estado===o.k?' selected':'')+'>'+esc(o.l)+' ('+(o.c*100).toFixed(2)+'%)</option>';}).join("")+'</select></div>')
+           :('<div><label class="f">Valor residual (%)</label><input value="'+esc(it.residual)+'" oninput="setBenf('+i+',\'residual\',this.value)" onchange="renderMain()" placeholder="0"></div>'))+
+      '</div>'+
+      '<div class="muted small" style="margin-top:6px">Método: <b>'+c.metodo+'</b> · Depreciação: <b>'+(c.K*100).toFixed(1)+'%</b>'+(ed?(' (idade '+(c.Kr*100).toFixed(1)+'% + conservação)'):(' (saldo de vida útil '+(c.saldo*100).toFixed(0)+'%)'))+' → <b>Valor atual: '+fmtBR(c.vd)+'</b></div>'+
+      '</div>';
+  }).join("");
+  return '<div class="card"><h2>🏗️ Benfeitorias e edificações (com depreciação)</h2>'+
+    '<p class="muted small">Edificações depreciam por <b>Ross-Heidecke</b> (idade + estado de conservação). Culturas e coberturas (pomares, tela antigranizo, irrigação) depreciam por <b>saldo de vida útil</b>. Preencha o valor a novo, a idade e a vida útil.</p>'+
+    (cards||'<div class="muted small">Nenhuma benfeitoria ainda.</div>')+
+    '<div class="kv" style="margin-top:8px"><span><b>Total das benfeitorias (valor atual depreciado)</b></span><span><b>'+fmtBR(tot)+'</b></span></div>'+
+    '<div style="height:8px"></div><div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn sm" onclick="addBenf(\'edificacao\')">➕ Edificação</button><button class="btn sm" onclick="addBenf(\'cultura\')">➕ Cultura/cobertura</button><button class="btn sm sec" onclick="seedBenf()">📋 Modelos comuns</button><button class="btn sm sec" onclick="gerarBenfWord(\''+a.id+'\')">📄 Gerar Word</button></div></div>'+
+    '<div class="card"><h2>🧮 Consolidação do valor de mercado</h2>'+
+      '<div class="kv"><span>Valor da terra nua <span class="muted small">(da aba Pesquisa)</span></span><span>'+fmtBR(valorTerra(a))+'</span></div>'+
+      '<div class="kv"><span>(+) Benfeitorias e edificações (depreciadas)</span><span>'+fmtBR(tot)+'</span></div>'+
+      '<div class="kv"><span><b>(=) Valor de mercado final</b></span><span><b>'+fmtBR(valorFinalMercado(a))+'</b></span></div>'+
+      '<div class="divider" style="margin:10px 0"></div>'+
+      '<div class="grid g2"><div><label class="f">Redução para liquidação forçada (%)</label><input value="'+esc((a.calc&&a.calc.reducaoLiquidez)||"")+'" oninput="setAval(\'calc.reducaoLiquidez\',this.value)" onchange="renderMain()" placeholder="ex.: 20"></div>'+
+        '<div class="kv"><span><b>Valor em liquidação forçada</b></span><span><b>'+fmtBR(valorLiquidacao(a))+'</b></span></div></div>'+
+      '<p class="muted small" style="margin-top:6px">O valor de mercado final (terra + benfeitorias) e o valor em liquidação forçada entram automaticamente no laudo, na seção de determinação do valor.</p></div>';
+}
+function addBenf(tipo){ if(!editAval.benfeitorias)editAval.benfeitorias={itens:[]}; editAval.benfeitorias.itens.push(tipo==='edificacao'?{tipo:'edificacao',desc:'',q:'',vu:'',idade:'',vida:'60',estado:'regular'}:{tipo:'cultura',desc:'',q:'',vu:'',idade:'',vida:'20',residual:''}); renderMain(); }
+function setBenf(i,k,v){ editAval.benfeitorias.itens[i][k]=v; }
+function delBenf(i){ editAval.benfeitorias.itens.splice(i,1); renderMain(); }
+function seedBenf(){ if(!editAval.benfeitorias)editAval.benfeitorias={itens:[]}; BENF_MODELOS.forEach(function(m){ editAval.benfeitorias.itens.push(Object.assign({q:'',vu:'',idade:''}, m)); }); renderMain(); }
+function gerarBenfWord(id){
+  var a=avalById(id)||editAval; var B=a.benfeitorias||{itens:[]}; var im=a.imovel||{}; var tot=0;
+  function P(t){return '<p>'+t+'</p>';}
+  var h='<h1>AVALIAÇÃO DE BENFEITORIAS E EDIFICAÇÕES</h1>';
+  h+=P('<b>Proprietário:</b> '+esc(im.proprietario||'—')+' &nbsp;·&nbsp; <b>Imóvel:</b> matrícula '+esc(im.matricula||'—')+(im.municipioUf?(' — '+esc(im.municipioUf)):'')+'.');
+  h+=P('Método: edificações avaliadas pelo critério de <b>Ross-Heidecke</b> (depreciação pela idade combinada com o estado de conservação); demais benfeitorias, culturas e coberturas depreciadas pelo <b>saldo de vida útil</b>.');
+  h+='<table><tr><th>Benfeitoria</th><th>Valor a novo (R$)</th><th>Idade/Vida</th><th>Estado</th><th>Método</th><th>Deprec.</th><th>Valor atual (R$)</th></tr>';
+  (B.itens||[]).forEach(function(it){ var c=calcBenf(it); tot+=c.vd; var est=it.tipo==='edificacao'?heidItem(it.estado).l:'—';
+    h+='<tr><td>'+esc(it.desc||'')+'</td><td style="text-align:right">'+fmtBR(c.vn)+'</td><td style="text-align:center">'+esc(it.idade||'0')+' / '+esc(it.vida||'—')+'</td><td>'+esc(est)+'</td><td>'+esc(c.metodo)+'</td><td style="text-align:center">'+(c.K*100).toFixed(1)+'%</td><td style="text-align:right">'+fmtBR(c.vd)+'</td></tr>'; });
+  h+='<tr><td colspan="6" style="text-align:right"><b>TOTAL</b></td><td style="text-align:right"><b>'+fmtBR(tot)+'</b></td></tr></table>';
+  h+=P((im.municipioUf?esc(im.municipioUf)+', ':'')+brData(a.dataLaudo)+'.');
+  h+='<div class="sig">_____________________________________________<br>'+esc(a.responsavel.nome||'')+(regDoResp(a.responsavel)?('<br>'+esc(regDoResp(a.responsavel))):'')+'</div>';
+  baixarDocWord('Benfeitorias_'+((im.proprietario||'imovel').replace(/[^a-z0-9]+/gi,'_')), h, qrVerifTexto(a));
+}
 /* ---- tabela de ressarcimento (editável) ---- */
 function avalRessarcHtml(a){
   if(!a.ressarcimento) a.ressarcimento={itens:[],obs:""};
@@ -2128,16 +2220,14 @@ function avalPesquisaHtml(a){
        '<div class="kv"><span>Campo de arbítrio (±10%)</span><span>'+fmtBR(c.campoLi)+' a '+fmtBR(c.campoLs)+'/m²</span></div>'+
        '<div class="kv"><span>Valor unitário (média no campo de arbítrio)</span><span><b>'+fmtBR(c.unitCampo)+'</b>/m² · '+fmtBR(c.unitHa)+'/ha</span></div>'+
        '<div class="kv"><span>Área do imóvel</span><span>'+(c.areaHa!=null?c.areaHa.toLocaleString("pt-BR")+" ha":"— (preencha área total m²)")+'</span></div>'+
-       '<div class="kv"><span><b>Valor de mercado sugerido</b></span><span><b>'+fmtBR(c.valorMercado)+'</b></span></div>'+
-       '<div class="grid g2" style="margin-top:8px">'+inpAv("Fator de liquidez (ex.: 0,95)","calc.fatorLiquidez",a.calc.fatorLiquidez)+'<div class="kv"><span>Liquidez sugerida</span><span>'+fmtBR(c.valorLiquidez)+'</span></div></div>';
+       '<div class="kv"><span><b>Valor da terra nua sugerido</b> (unitário × área)</span><span><b>'+fmtBR(c.valorMercado)+'</b></span></div>';
   }
   if(modoVist){
     h+='<div class="divider" style="margin:10px 0"></div><div class="banner info" style="margin:0">🔒 O <b>tratamento estatístico</b> e a <b>definição do valor final</b> são feitos pelo escritório. Aqui você monta a pesquisa (imóveis comparativos) e confere a prévia acima.</div></div>';
   } else {
     h+='<div class="divider" style="margin:10px 0"></div><div class="grid g2">'+
-       inpAv("✅ Valor de mercado FINAL (confirmar)","valorMercado",a.valorMercado||(c.valorMercado!=null?fmtBR(c.valorMercado):""))+
-       inpAv("✅ Valor de liquidez FINAL (confirmar)","valorLiquidez",a.valorLiquidez||(c.valorLiquidez!=null?fmtBR(c.valorLiquidez):""))+'</div>'+
-       '<p class="muted small" style="margin-top:6px">O valor final é seu — o cálculo é uma sugestão. Ajuste conforme sua análise técnica.</p></div>';
+       inpAv("✅ Valor da TERRA NUA (confirmar, R$)","valorMercado",a.valorMercado||(c.valorMercado!=null?fmtBR(c.valorMercado):""))+'</div>'+
+       '<p class="muted small" style="margin-top:6px">Este é o valor da <b>terra nua</b>. As benfeitorias e o valor de mercado final (terra + benfeitorias) são consolidados na aba <b>🏗️ Benfeitorias</b>. O valor é seu — o cálculo é uma sugestão.</p></div>';
   }
   return h;
 }
@@ -4713,11 +4803,17 @@ function _laudoWord(a, croquiImg){
     h+=P('<b>5.5) Valor unitário do imóvel avaliando:</b> adotada a média dos elementos situados dentro do campo de arbítrio, resultando em '+fmtBR(c.unitCampo)+'/m² (equivalente a '+fmtBR(c.unitHa)+'/ha).');
   }
   h+='<h2>6) Determinação do valor do imóvel</h2>';
-  h+=P('<b>6.1) Valor de mercado:</b> '+esc(a.valorMercado||(c.valorMercado!=null?fmtBR(c.valorMercado):"—"))+(c.unitHa?(' (base '+fmtBR(c.unitHa)+'/ha)'):'')+'.');
-  h+=P('<b>6.2) Valor de liquidez:</b> '+esc(a.valorLiquidez||(c.valorLiquidez!=null?fmtBR(c.valorLiquidez):"—"))+'.');
-  var rIt=(a.ressarcimento&&a.ressarcimento.itens)||[]; var rTot=0; rIt.forEach(function(it){ rTot+=(num(it.qtd)||0)*(num(it.valorUnit)||0); });
-  if(rTot>0) h+=P('<b>6.3) Benfeitorias / ressarcimento:</b> '+fmtBR(rTot)+' (conforme tabela de ressarcimento em anexo).');
-  h+=P('Esta avaliação foi elaborada considerando o valor da terra nua'+(rTot>0?', com as benfeitorias discriminadas em tabela própria':'')+'.');
+  var vTerra=valorTerra(a), vBenf=benfTotal(a), vFinal=vTerra+vBenf, red=reducaoLiq(a), vLiq=vFinal*(1-red/100);
+  h+=P('<b>6.1) Valor da terra nua:</b> '+fmtBR(vTerra)+(c.unitHa?(' (base '+fmtBR(c.unitHa)+'/ha'+(c.areaHa!=null?(' × '+c.areaHa.toLocaleString("pt-BR")+' ha'):'')+')'):'')+'.');
+  var bIt=(a.benfeitorias&&a.benfeitorias.itens)||[];
+  if(bIt.length){
+    h+=P('<b>6.2) Benfeitorias e edificações</b> — edificações avaliadas por Ross-Heidecke (idade + estado de conservação) e demais benfeitorias, culturas e coberturas pelo saldo de vida útil:');
+    h+='<table><tr><th>Benfeitoria</th><th>Valor a novo (R$)</th><th>Idade/Vida</th><th>Estado</th><th>Deprec.</th><th>Valor atual (R$)</th></tr>';
+    bIt.forEach(function(it){ var cc=calcBenf(it); h+='<tr><td>'+esc(it.desc||"")+'</td><td style="text-align:right">'+fmtBR(cc.vn)+'</td><td style="text-align:center">'+esc(it.idade||"0")+' / '+esc(it.vida||"—")+'</td><td>'+(it.tipo==='edificacao'?esc(heidItem(it.estado).l):'—')+'</td><td style="text-align:center">'+(cc.K*100).toFixed(1)+'%</td><td style="text-align:right">'+fmtBR(cc.vd)+'</td></tr>'; });
+    h+='<tr><td colspan="5" style="text-align:right"><b>Total das benfeitorias</b></td><td style="text-align:right"><b>'+fmtBR(vBenf)+'</b></td></tr></table>';
+  } else { h+=P('<b>6.2) Benfeitorias e edificações:</b> não foram consideradas benfeitorias (avaliação da terra nua).'); }
+  h+=P('<b>6.3) Valor de mercado final</b> (terra nua + benfeitorias): <b>'+fmtBR(vFinal)+'</b>.');
+  h+=P('<b>6.4) Valor em liquidação forçada</b> — aplicada redução de '+fmt2(red)+'% sobre o valor de mercado, para hipótese de venda em prazo reduzido: <b>'+fmtBR(vLiq)+'</b>.');
   h+=P((im.municipioUf||"São Joaquim, SC")+', '+brData(a.dataLaudo)+'.');
   h+='<div class="sig">_____________________________________________<br>'+esc(a.responsavel.nome||"")+(regDoResp(a.responsavel)?('<br>'+esc(regDoResp(a.responsavel))):'')+'</div>';
   if((a.coordenadas||[]).length){ h+='<h2>ANEXO — COORDENADAS GEOGRÁFICAS</h2>'+
