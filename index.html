@@ -304,7 +304,7 @@ function svv(id){ var el=document.getElementById(id); return el?el.value.trim():
 /* ---- utils ---- */
 function uid(){ return "x"+Date.now().toString(36)+Math.floor(Math.random()*1000); }
 function hoje(){ return new Date().toISOString().slice(0,10); }
-function brData(iso){ if(!iso) return "—"; var p=String(iso).slice(0,10).split("-"); return p.length===3?p[2]+"@sistema/"+p[1]+"@sistema/"+p[0]:iso; }
+function brData(iso){ if(!iso) return "—"; var p=String(iso).slice(0,10).split("-"); return p.length===3?p[2]+"/"+p[1]+"/"+p[0]:iso; }
 function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
 function q(s){ return String(s==null?"":s).replace(/'/g,"\\'"); }
 function num(v){ v=String(v==null?"":v).replace(/[^\d.,-]/g,"").replace(/\./g,"").replace(",","."); var n=parseFloat(v); return isNaN(n)?null:n; }
@@ -589,6 +589,7 @@ function renderMain(){
   var html="";
   // guardião: telas restritas ao Master (defesa no cliente; o servidor também bloqueia os dados/ações)
   if(view==="master" && !ehMaster()){ view=(navFor(user)[0]||"crm"); }
+  if(view==="novoaval" && !ehMaster()){ view="campo"; campoTab="crm"; }
   if(view==="crm") html=crmHtml();
   else if(view==="diag") html=listaHtml();
   else if(view==="novo"){ if(!edit) edit=novoDiag(); html=formHtml(); }
@@ -692,6 +693,7 @@ function conviteHtml(){
     '<p class="muted small" style="text-align:center;margin-top:16px;opacity:.8">Bem-vindo, produtor 🌱</p></div>';
 }
 function _entrouConvite(r){
+  try{ if(conviteToken) localStorage.setItem('agt_convite', conviteToken); }catch(e){}  // p/ reentrar pela senha (PIN) após expirar
   user=r.user; TOKEN=r.token; conviteToken=null; convitePrecisaSenha=false; conviteNome=""; fluxoLogin=null;
   try{ history.replaceState(null,'',location.pathname); }catch(e){}
   salvarSessao();
@@ -760,9 +762,26 @@ function aceitarTermosAcao(){
     if(r&&r.ok){ user.termosAceitos=true; user.primeiroAcesso=false; entrarApp(); } else alert('Falha ao registrar o aceite.');
   });
 }
-function salvarSessao(){ try{ localStorage.setItem('agt_sess', JSON.stringify({token:TOKEN, user:user})); }catch(e){} }
+var SESSAO_IDLE_MS=60*60*1000; // 1 hora de inatividade
+function hojeStr(){ return new Date().toISOString().slice(0,10); }
+function salvarSessao(){ try{ localStorage.setItem('agt_sess', JSON.stringify({token:TOKEN, user:user, loginDay:hojeStr(), lastAt:Date.now()})); }catch(e){} }
 function limparSessao(){ try{ localStorage.removeItem('agt_sess'); }catch(e){} }
-function sair(){ limparSessao(); user=null; TOKEN=""; view=""; trocaModo=false; edit=null; editProj=null; verId=null; verProjId=null; render(); }
+// marca atividade (renova a janela de 1h) — throttled p/ não gravar a cada clique
+var _ultAtiv=0;
+function marcarAtividade(){
+  if(!user||!TOKEN) return; var ag=Date.now(); if(ag-_ultAtiv<30000) return; _ultAtiv=ag;
+  try{ var s=JSON.parse(localStorage.getItem('agt_sess')||'null'); if(s&&s.token){ s.lastAt=ag; localStorage.setItem('agt_sess', JSON.stringify(s)); } }catch(e){}
+}
+function sessaoValida(s){
+  if(!s||!s.token||!s.user) return false;
+  var ag=Date.now();
+  if(s.lastAt && (ag - s.lastAt) > SESSAO_IDLE_MS) return false;   // +1h de inatividade -> pede senha
+  if(s.loginDay && s.loginDay !== hojeStr()) return false;         // novo dia -> pede senha
+  return true;
+}
+try{ ['click','keydown','touchstart'].forEach(function(ev){ document.addEventListener(ev, marcarAtividade, {passive:true}); }); }catch(e){}
+try{ setInterval(marcarAtividade, 60000); }catch(e){}
+function sair(){ limparSessao(); try{ localStorage.removeItem('agt_convite'); }catch(e){} user=null; TOKEN=""; view=""; trocaModo=false; edit=null; editProj=null; verId=null; verProjId=null; render(); }
 /* ---- troca de senha (obrigatória a cada 60 dias, ou voluntária) ---- */
 function abrirTrocaSenha(){ trocaModo=true; render(); }
 function cancelarTroca(){ trocaModo=false; render(); }
@@ -852,7 +871,7 @@ function listaHtml(){
   var lista=diagnosticos.filter(function(d){return verArquivados? d.arquivado : !d.arquivado;}).sort(function(a,b){return (b.criadoEm||"").localeCompare(a.criadoEm||"");});
   var podeNovo=navFor(user).indexOf("novo")>-1;
   return '<div class="row" style="justify-content:space-between;margin-bottom:8px">'+
-      '<button class="btn sm '+(verArquivados?"":"sec")+'" onclick="toggleArquivados()">'+(verArquivados?"↩️ Ver ativos":"🗄️ Ver arquivados"+(arqCount?" ("+arqCount+"@sistema)":""))+'</button>'+
+      '<button class="btn sm '+(verArquivados?"":"sec")+'" onclick="toggleArquivados()">'+(verArquivados?"↩️ Ver ativos":"🗄️ Ver arquivados"+(arqCount?" ("+arqCount+")":""))+'</button>'+
       (podeNovo?'<button class="btn" onclick="irView(\'novo\')">➕ Novo diagnóstico</button>':'<span></span>')+'</div>'+
     (user.papel==="juridico"?'<div class="banner info">Você está no acesso <b>Jurídico</b>: pode consultar e registrar observações jurídicas.</div>':'')+
     (lista.length? lista.map(itemLista).join(""):'<div class="card muted">'+(verArquivados?"Nenhum diagnóstico arquivado.":"Nenhum diagnóstico ativo.")+'</div>');
@@ -886,7 +905,7 @@ function setServico(id){ edit.servico=id; renderMain(); }
 function setStatus(s){ edit.status=s; }
 function togglePonto(p){ var i=edit.pontos.indexOf(p); if(i>-1)edit.pontos.splice(i,1); else edit.pontos.push(p); }
 function toggleOport(o){ var i=edit.oportunidades.indexOf(o); if(i>-1)edit.oportunidades.splice(i,1); else edit.oportunidades.push(o); }
-function anexar(){ var f=document.getElementById("fileInput"); if(!f||!f.files)return; for(var i=0;i<f.files.length;i++)edit.arquivos.push({nome:f.files[i].name,tamanho:Math.round(f.files[i].size/1024)+"@sistema KB"}); renderMain(); }
+function anexar(){ var f=document.getElementById("fileInput"); if(!f||!f.files)return; for(var i=0;i<f.files.length;i++)edit.arquivos.push({nome:f.files[i].name,tamanho:Math.round(f.files[i].size/1024)+" KB"}); renderMain(); }
 function removerArq(i){ edit.arquivos.splice(i,1); renderMain(); }
 function formHtml(){
   var d=edit, div=divergenciaAreas(d), f=flagMatricula(d), c=completude(d), fin=podeVerFinanceiro();
@@ -940,8 +959,8 @@ function whatsCliente(id){
   var d=diagnosticos.find(function(x){return x.id===id;})||edit; var w=foneWhats(d.cliente.fone);
   if(!w){ alert("Cliente sem telefone."); return; }
   var link=d.pacoteLink||"(link dos documentos será gerado no Drive quando a nuvem estiver ativa)";
-  var msg="Olá "+(d.cliente.nome||"")+"@sistema! Aqui é da "+cfg.brand+"@sistema. Seguem os documentos do imóvel "+(d.cliente.nomeImovel||"")+"@sistema: "+link;
-  window.open("https://wa.me/"+w+"@sistema?text="+encodeURIComponent(msg),"_blank");
+  var msg="Olá "+(d.cliente.nome||"")+"! Aqui é da "+cfg.brand+". Seguem os documentos do imóvel "+(d.cliente.nomeImovel||"")+": "+link;
+  window.open("https://wa.me/"+w+"?text="+encodeURIComponent(msg),"_blank");
 }
 
 /* ---- fila / detalhe engenheiro ---- */
@@ -964,8 +983,8 @@ function verHtml(){
   return '<div class="row" style="justify-content:space-between"><h1>'+esc(d.cliente.nome)+(d.arquivado?' <span class="pill neutro">arquivado</span>':'')+'</h1><button class="btn sec" onclick="irView(\''+voltar+'\')">Voltar</button></div><div style="height:10px"></div>'+
     acoesDiagHtml(d)+
     (div?'<div class="banner erro">⚠️ Divergência de área sinalizada.</div>':'')+'<div class="banner '+f.cls+'">📄 '+f.txt+'</div>'+
-    '<div class="card"><h2>Resumo</h2>'+kv("Imóvel",d.cliente.nomeImovel)+kv("Município/UF",d.cliente.municipioUf)+kv("Área aprox.",d.cliente.areaHa+"@sistema ha")+
-      kv("Serviço",(SERVICOS.find(function(s){return s.id===d.servico;})||{}).nome)+kv("Status",d.status)+kv("Docs recebidos",c.rec+"@sistema/"+c.total)+
+    '<div class="card"><h2>Resumo</h2>'+kv("Imóvel",d.cliente.nomeImovel)+kv("Município/UF",d.cliente.municipioUf)+kv("Área aprox.",d.cliente.areaHa+" ha")+
+      kv("Serviço",(SERVICOS.find(function(s){return s.id===d.servico;})||{}).nome)+kv("Status",d.status)+kv("Docs recebidos",c.rec+"/"+c.total)+
       kv("CCIR",temDoc(d,"CCIR")?"sim":"não")+kv("CAR",temDoc(d,"CAR")?"sim":"não")+kv("ADA/IBAMA",temDoc(d,"ADA (IBAMA), se existente")?"sim":"não")+
       (fin?kv("Valor contratado","R$ "+(d.valor||"—")):"")+'</div>'+
     '<div class="card"><h2>Áreas (ha)</h2>'+kv("Matrícula",d.areas.matricula)+kv("CCIR",d.areas.ccir)+kv("CAR",d.areas.car)+kv("CAFIR/CIB",d.areas.cafir)+kv("SIGEF",d.areas.sigef)+'</div>'+
@@ -996,7 +1015,7 @@ function arquivarDiag(id){ var d=diagnosticos.find(function(x){return x.id===id;
 function excluirDiag(id){ if(!ehMaster()){alert("Só o Master pode excluir.");return;} var d=diagnosticos.find(function(x){return x.id===id;}); if(!d)return; if(!confirm('Excluir o diagnóstico de "'+(d.cliente.nome||"")+'"?\n\nEle some das listas (nada é apagado de verdade — dá pra recuperar pelo backup).')) return; apiRemover("diagnosticos",id); diagnosticos=diagnosticos.filter(function(x){return x.id!==id;}); alert("Diagnóstico excluído."); view=voltarPadrao_(); render(); }
 function baixarJsonObj(obj,prefixo,nome){
   var b=new Blob([JSON.stringify(obj,null,2)],{type:"application/json"}); var a=document.createElement("a"); a.href=URL.createObjectURL(b);
-  a.download=prefixo+"@sistema_"+String(nome||"imovel").replace(/[^a-z0-9]+/gi,"_")+"@sistema.json"; a.click();
+  a.download=prefixo+"_"+String(nome||"imovel").replace(/[^a-z0-9]+/gi,"_")+".json"; a.click();
 }
 function exportarJson(id){ var d=diagnosticos.find(function(x){return x.id===id;}); if(!d)return; baixarJsonObj(d,"diagnostico",d.cliente.nome); }
 function baixarDiag(){ if(!edit)return; baixarJsonObj(edit,"diagnostico",edit.cliente&&edit.cliente.nome); }
@@ -1004,7 +1023,7 @@ function baixarMeuBackup(){
   var dump={ gerado:new Date().toISOString(), usuario:(user&&user.nome)||"", papel:(user&&user.papel)||"",
     diagnosticos:diagnosticos, projetos:projetos, atendimentos:atendimentos, solicitacoes:solicitacoes,
     classificados:classificados, prestadores:prestadores, perfis:perfis };
-  baixarJsonObj(dump,"backup_dados",((user&&user.nome)||"usuario")+"@sistema_"+new Date().toISOString().slice(0,10));
+  baixarJsonObj(dump,"backup_dados",((user&&user.nome)||"usuario")+"_"+new Date().toISOString().slice(0,10));
   alert("Backup baixado. Guarde numa pasta segura do seu PC.\n\n(Os dados também ficam salvos na nuvem/Google Drive automaticamente.)");
 }
 function marcarImportado(id){ var d=diagnosticos.find(function(x){return x.id===id;}); if(!d)return; d.importadoEm=new Date().toISOString(); if(!/conclu/i.test(d.status))d.status="Em análise técnica"; registrarMov(d,"Importado no sistema técnico"); salvarDiag(); render(); }
@@ -1090,7 +1109,7 @@ function editarProvidencia(id,pid){
   var hr=prompt("Hora (HH:MM) — opcional:",pr.hora||""); if(hr===null)return;
   var rs=prompt("Responsável — opcional:",pr.responsavel||""); if(rs===null)return;
   pr.texto=tx; pr.data=(dt||"").trim(); pr.hora=(hr||"").trim(); pr.responsavel=(rs||"").trim();
-  registrarMov(p,"Providência editada: "+tx+(pr.data?(" ("+brData(pr.data)+(pr.hora?(" "+pr.hora):"")+"@sistema)"):""));
+  registrarMov(p,"Providência editada: "+tx+(pr.data?(" ("+brData(pr.data)+(pr.hora?(" "+pr.hora):"")+")"):""));
   apiSalvarDoc('projetos',p); render();
 }
 function projVerHtml(){
@@ -1106,7 +1125,7 @@ function projVerHtml(){
     '<span class="pill '+stCls+'">'+esc(p.status||"Aberto")+'</span>'+
     '<span class="muted small">📥 Entrada: '+(p.dataEntrada?brData(p.dataEntrada):"—")+'</span>'+
     '<span class="muted small">✅ Conclusão: '+(p.dataConclusao?brData(p.dataConclusao):"—")+'</span></div></div>';
-  h+='<div class="card"><h2>Imóvel</h2>'+kv("Proprietário",p.imovel.proprietario)+kv("Matrícula",p.imovel.matricula)+kv("Comarca",p.imovel.comarca)+kv("Cartório",p.imovel.cartorio)+kv("Município/UF",p.imovel.municipioUf)+kv("Área",p.imovel.area+"@sistema ha")+kv("Perímetro",p.imovel.perimetro+"@sistema m")+'</div>';
+  h+='<div class="card"><h2>Imóvel</h2>'+kv("Proprietário",p.imovel.proprietario)+kv("Matrícula",p.imovel.matricula)+kv("Comarca",p.imovel.comarca)+kv("Cartório",p.imovel.cartorio)+kv("Município/UF",p.imovel.municipioUf)+kv("Área",p.imovel.area+" ha")+kv("Perímetro",p.imovel.perimetro+" m")+'</div>';
   // Documentos
   h+='<div class="card"><h2>📎 Documentos ('+(p.arquivos||[]).length+')</h2>'+
     ((p.arquivos||[]).length?p.arquivos.map(function(a,i){
@@ -1231,7 +1250,7 @@ function addProvidencia(id){ var p=projById(id); if(!p||!podeEditarProj(p))retur
   var tx=((document.getElementById('projProvTxt')||{}).value||"").trim(); if(!tx){alert("Descreva a providência.");return;}
   var dt=(document.getElementById('projProvData')||{}).value||""; var hr=(document.getElementById('projProvHora')||{}).value||""; var rs=(document.getElementById('projProvResp')||{}).value||"";
   if(!p.providencias)p.providencias=[]; p.providencias.push({id:uid(),texto:tx,data:dt,hora:hr,responsavel:rs,feito:false,criadoPor:user.nome,criadoEm:new Date().toISOString()});
-  registrarMov(p,"Providência agendada: "+tx+(dt?(" para "+brData(dt)+(hr?(" "+hr):"")):"")+(rs?(" ["+rs+"@sistema]"):""));
+  registrarMov(p,"Providência agendada: "+tx+(dt?(" para "+brData(dt)+(hr?(" "+hr):"")):"")+(rs?(" ["+rs+"]"):""));
   apiSalvarDoc('projetos',p); render(); }
 function toggleProvidencia(id,pid){ var p=projById(id); if(!p||!podeEditarProj(p))return; var pr=(p.providencias||[]).find(function(x){return x.id===pid;}); if(!pr)return; pr.feito=!pr.feito; registrarMov(p,(pr.feito?"Providência concluída: ":"Providência reaberta: ")+pr.texto); apiSalvarDoc('projetos',p); render(); }
 function delProvidencia(id,pid){ var p=projById(id); if(!p||!podeEditarProj(p))return; if(!confirm("Remover esta providência?"))return; p.providencias=(p.providencias||[]).filter(function(x){return x.id!==pid;}); apiSalvarDoc('projetos',p); render(); }
@@ -1239,11 +1258,11 @@ function editarProj(id){ editProj=JSON.parse(JSON.stringify(projetos.find(functi
 function gerarPecas(id){
   var p=projetos.find(function(x){return x.id===id;})||editProj; var sel=Object.keys(p.pecas||{}).filter(function(k){return p.pecas[k];});
   if(!sel.length){ alert("Selecione ao menos uma peça para gerar."); return; }
-  alert("No sistema real, os dados vão ao SERVIDOR, que roda o motor técnico (código protegido) e devolve os PDFs:\n\n• "+sel.join("\n• ")+"@sistema\n\nAqui no demo é só a simulação do fluxo.");
+  alert("No sistema real, os dados vão ao SERVIDOR, que roda o motor técnico (código protegido) e devolve os PDFs:\n\n• "+sel.join("\n• ")+"\n\nAqui no demo é só a simulação do fluxo.");
 }
 function baixarProjeto(id){ var p=projetos.find(function(x){return x.id===id;})||editProj;
   var b=new Blob([JSON.stringify(p,null,2)],{type:"application/json"}); var a=document.createElement("a"); a.href=URL.createObjectURL(b);
-  a.download="projeto_"+((p.nome||p.imovel.denominacao||"imovel").replace(/[^a-z0-9]+/gi,"_"))+"@sistema.json"; a.click(); }
+  a.download="projeto_"+((p.nome||p.imovel.denominacao||"imovel").replace(/[^a-z0-9]+/gi,"_"))+".json"; a.click(); }
 
 /* =========================================================================
    MÓDULO PARCEIROS — fluxo de serviços com parceiros (técnico/corretor/advogado)
@@ -1282,8 +1301,8 @@ function setParcTab(t){ parcTab=t; renderMain(); }
 function statusBucket(st){ st=st||""; if(/conclu|entreg|aprov/i.test(st))return "Concluído"; if(/aguard/i.test(st))return "Aguardando"; if(/an[aá]lise|execu|andamento|parecer|process|retrabalho/i.test(st))return "Em andamento"; return "Aberto"; }
 function itensDoParceiro(nome){
   var out=[];
-  (trabalhos||[]).forEach(function(t){ if(eqNome(t.parceiro,nome)||(t.parceirosAtribuidos||[]).some(function(n){return eqNome(n,nome);})) out.push({tipo:'serviço',id:t.id,titulo:(t.titulo||(t.imovel&&t.imovel.denominacao)||'(serviço)'),status:t.status,sub:((t.imovel&&t.imovel.municipioUf)||t.cliente&&t.cliente.nome||''),onclick:"verParc('"+t.id+"@sistema')"}); });
-  (projetos||[]).forEach(function(p){ if(eqNome(p.dono,nome)||(p.parceirosAtribuidos||[]).some(function(n){return eqNome(n,nome);})) out.push({tipo:'projeto',id:p.id,titulo:(p.nome||(p.imovel&&p.imovel.denominacao)||'(projeto)'),status:p.status||'Aberto',sub:(p.tipo||''),onclick:"verProj('"+p.id+"@sistema')"}); });
+  (trabalhos||[]).forEach(function(t){ if(eqNome(t.parceiro,nome)||(t.parceirosAtribuidos||[]).some(function(n){return eqNome(n,nome);})) out.push({tipo:'serviço',id:t.id,titulo:(t.titulo||(t.imovel&&t.imovel.denominacao)||'(serviço)'),status:t.status,sub:((t.imovel&&t.imovel.municipioUf)||t.cliente&&t.cliente.nome||''),onclick:"verParc('"+t.id+"')"}); });
+  (projetos||[]).forEach(function(p){ if(eqNome(p.dono,nome)||(p.parceirosAtribuidos||[]).some(function(n){return eqNome(n,nome);})) out.push({tipo:'projeto',id:p.id,titulo:(p.nome||(p.imovel&&p.imovel.denominacao)||'(projeto)'),status:p.status||'Aberto',sub:(p.tipo||''),onclick:"verProj('"+p.id+"')"}); });
   return out;
 }
 function painelCrmHtml(){
@@ -1385,7 +1404,7 @@ function parcVerHtml(){
     '<select onchange="mudarStatusParc(\''+t.id+'\',this.value)" style="font-size:13px;padding:6px">'+PARC_STATUS.map(function(st){return '<option '+(t.status===st?"selected":"")+'>'+st+'</option>';}).join("")+'</select></div></div>';
   // dados
   h+='<div class="card"><h2>Parceiro & cliente</h2>'+kv("Parceiro",t.parceiro)+kv("WhatsApp do parceiro",t.parceiroFone)+kv("Cliente",t.cliente.nome)+kv("WhatsApp do cliente",t.cliente.fone)+'</div>';
-  h+='<div class="card"><h2>Imóvel</h2>'+kv("Denominação",t.imovel.denominacao)+kv("Matrícula",t.imovel.matricula)+kv("Município/UF",t.imovel.municipioUf)+kv("Área",t.imovel.area?(t.imovel.area+"@sistema ha"):"")+(t.tipo==="tecnico"?(kv("Comarca",t.imovel.comarca)+kv("Cartório",t.imovel.cartorio)):"")+'</div>';
+  h+='<div class="card"><h2>Imóvel</h2>'+kv("Denominação",t.imovel.denominacao)+kv("Matrícula",t.imovel.matricula)+kv("Município/UF",t.imovel.municipioUf)+kv("Área",t.imovel.area?(t.imovel.area+" ha"):"")+(t.tipo==="tecnico"?(kv("Comarca",t.imovel.comarca)+kv("Cartório",t.imovel.cartorio)):"")+'</div>';
   if(t.tipo==="tecnico"&&(t.servico||t.procedimentos)) h+='<div class="card"><h2>Serviço técnico</h2>'+kv("Serviço",t.servico)+kv("Área do levantamento",t.areaServ)+(t.procedimentos?'<div class="kv"><span>Procedimentos</span><span>'+esc(t.procedimentos)+'</span></div>':'')+'</div>';
   if(t.descricao) h+='<div class="card"><h2>Descrição</h2><p style="white-space:pre-wrap">'+esc(t.descricao)+'</p></div>';
   // anexos do parceiro
@@ -1410,7 +1429,7 @@ function parcVerHtml(){
 function mudarStatusParc(id,st){ var t=trabById(id); if(!t)return; if(t.status===st)return; t.status=st; registrarMov(t,"Status alterado para: "+st); salvarTrab(); render(); }
 function addMovParc(id){ var t=trabById(id); if(!t)return; var el=document.getElementById("movParcTxt"); var txt=el?el.value.trim():""; if(!txt){alert("Escreva o andamento.");return;}
   registrarMov(t,txt); salvarTrab(); render();
-  setTimeout(function(){ if(confirm("Avisar o "+(ehEscritorio()?"parceiro":"escritório")+"@sistema pelo WhatsApp?")){ ehEscritorio()?avisarParceiro(id):avisarDono(id); } },150); }
+  setTimeout(function(){ if(confirm("Avisar o "+(ehEscritorio()?"parceiro":"escritório")+" pelo WhatsApp?")){ ehEscritorio()?avisarParceiro(id):avisarDono(id); } },150); }
 function addEntregaParc(id){ var t=trabById(id); if(!t)return; var nome=prompt("Nome do trabalho pronto (ex.: Memorial descritivo.pdf):"); if(!nome)return;
   var link=prompt("Cole o LINK para download (Google Drive):","")||"";
   if(!t.entregas)t.entregas=[]; t.entregas.push({nome:nome,link:link,quando:new Date().toISOString(),quem:user.nome});
@@ -1419,12 +1438,12 @@ function addEntregaParc(id){ var t=trabById(id); if(!t)return; var nome=prompt("
 function removeEntregaParc(id,i){ var t=trabById(id); if(!t)return; t.entregas.splice(i,1); salvarTrab(); render(); }
 function msgAndamento(t){
   var last=(t.movimentos&&t.movimentos.length)?t.movimentos[t.movimentos.length-1].texto:t.status;
-  var m="*"+(cfg.brand||"Sistema")+"@sistema* — Andamento do serviço\n📋 "+(t.titulo||"(serviço)")+"@sistema\n📌 Status: "+t.status+"@sistema\n";
-  if(last)m+="📝 "+last+"@sistema\n";
-  if(t.entregas&&t.entregas.length){ var e=t.entregas[t.entregas.length-1]; m+="✅ Pronto p/ baixar: "+e.nome+(e.link?(" — "+e.link):"")+"@sistema\n"; }
+  var m="*"+(cfg.brand||"Sistema")+"* — Andamento do serviço\n📋 "+(t.titulo||"(serviço)")+"\n📌 Status: "+t.status+"\n";
+  if(last)m+="📝 "+last+"\n";
+  if(t.entregas&&t.entregas.length){ var e=t.entregas[t.entregas.length-1]; m+="✅ Pronto p/ baixar: "+e.nome+(e.link?(" — "+e.link):"")+"\n"; }
   return m;
 }
-function abrirWa(f,msg){ f=foneWhats(f); if(!f){alert("Sem telefone cadastrado.");return;} window.open("https://wa.me/"+f+"@sistema?text="+encodeURIComponent(msg),"_blank"); }
+function abrirWa(f,msg){ f=foneWhats(f); if(!f){alert("Sem telefone cadastrado.");return;} window.open("https://wa.me/"+f+"?text="+encodeURIComponent(msg),"_blank"); }
 function avisarDono(id){ var t=trabById(id); if(!t)return; var f=donoFone(); if(!f){alert("O escritório ainda não configurou o WhatsApp (peça ao gestor em ‘Meu WhatsApp p/ parceiros’).");return;} abrirWa(f,msgAndamento(t)); }
 function avisarParceiro(id){ var t=trabById(id); if(!t)return; abrirWa(t.parceiroFone,msgAndamento(t)); }
 function avisarCliente(id){ var t=trabById(id); if(!t)return; abrirWa(t.cliente&&t.cliente.fone,msgAndamento(t)); }
@@ -1463,7 +1482,7 @@ function papelNome(p){ return (PAPEIS[p]||{}).nome||p||"—"; }
 function compVigente(c){ if(c.revogado) return false; if(c.validadeTipo==="temporario" && c.validade && c.validade<hoje()) return false; return true; }
 function compById(id){ return compartilhamentos.find(function(x){return x.id===id;}); }
 function solDById(id){ return solicitacoesDados.find(function(x){return x.id===id;}); }
-function abrirWa2(f,msg){ f=foneWhats(f); if(!f){alert("Ator sem WhatsApp cadastrado no diretório.");return;} window.open("https://wa.me/"+f+"@sistema?text="+encodeURIComponent(msg),"_blank"); }
+function abrirWa2(f,msg){ f=foneWhats(f); if(!f){alert("Ator sem WhatsApp cadastrado no diretório.");return;} window.open("https://wa.me/"+f+"?text="+encodeURIComponent(msg),"_blank"); }
 
 /* ---- navegação interna (sub-abas) ---- */
 function setRedeTab(t){ redeTab=t; renderMain(); }
@@ -1548,7 +1567,7 @@ function revogarComp(id,val){ var c=compById(id); if(!c)return; c.revogado=val; 
 function renovarComp(id){ var c=compById(id); if(!c)return; var v=prompt("Nova data de validade (AAAA-MM-DD):",c.validade||dataMais(90)); if(!v)return; c.validade=v; c.validadeTipo="temporario"; c.revogado=false; registrarMov(c,"Prazo renovado até "+v); salvarComp(); renderMain(); }
 function excluirComp(id){ if(!ehMaster())return; if(!confirm("Excluir este pacote?"))return; apiRemover('compartilhamentos',id); var i=compartilhamentos.findIndex(function(x){return x.id===id;}); if(i>-1)compartilhamentos.splice(i,1); renderMain(); }
 function avisarComp(id,nome){ var c=compById(id); if(!c)return;
-  var msg="*"+(cfg.brand||"Sistema")+"@sistema* — Dados disponíveis\n📦 "+(c.titulo||"pacote")+"@sistema\n"+(c.cliente&&c.cliente.nome?("👤 Cliente: "+c.cliente.nome+"@sistema\n"):"")+"@sistema🔐 Acesse sua conta para baixar"+(c.validadeTipo==="temporario"&&c.validade?(" (até "+brData(c.validade)+"@sistema)"):"")+"@sistema.";
+  var msg="*"+(cfg.brand||"Sistema")+"* — Dados disponíveis\n📦 "+(c.titulo||"pacote")+"\n"+(c.cliente&&c.cliente.nome?("👤 Cliente: "+c.cliente.nome+"\n"):"")+"🔐 Acesse sua conta para baixar"+(c.validadeTipo==="temporario"&&c.validade?(" (até "+brData(c.validade)+")"):"")+".";
   abrirWa2(foneDir(nome),msg); }
 
 /* ===================== (2) SOLICITAÇÕES DE DADOS ===================== */
@@ -1610,7 +1629,7 @@ function responderSolD(id){ var s=solDById(id); if(!s)return;
 function recusarSolD(id){ var s=solDById(id); if(!s)return; if(!confirm("Recusar este pedido?"))return; s.status="Recusada"; registrarMov(s,"Recusada por "+user.nome); salvarSolD(); renderMain(); }
 function avisarSolD(id,quem){ var s=solDById(id); if(!s)return;
   var alvoNome = quem==="alvo"? s.alvo : s.solicitante;
-  var msg="*"+(cfg.brand||"Sistema")+"@sistema* — Solicitação de dados\n📄 "+s.tipoDado+(s.cliente&&s.cliente.nome?("\n👤 Cliente: "+s.cliente.nome):"")+"@sistema\n📌 Status: "+s.status+(s.resposta?("\n📝 "+s.resposta):"");
+  var msg="*"+(cfg.brand||"Sistema")+"* — Solicitação de dados\n📄 "+s.tipoDado+(s.cliente&&s.cliente.nome?("\n👤 Cliente: "+s.cliente.nome):"")+"\n📌 Status: "+s.status+(s.resposta?("\n📝 "+s.resposta):"");
   abrirWa2(foneDir(alvoNome),msg);
 }
 
@@ -1639,7 +1658,8 @@ function campoHtml(){
   var tabs='<div class="row" style="gap:6px;margin-bottom:10px;flex-wrap:wrap">'+
     '<button class="btn sm '+(campoTab==="crm"?"":"sec")+'" onclick="setCampoTab(\'crm\')">🗂️ CRM de campo</button>'+
     '<button class="btn sm '+(campoTab==="agenda"?"":"sec")+'" onclick="setCampoTab(\'agenda\')">📅 Agenda</button>'+
-    '<button class="btn sm '+(campoTab==="aval"?"":"sec")+'" onclick="setCampoTab(\'aval\')">📐 Vistoria de Avaliação</button></div>';
+    (ehMaster()?'<button class="btn sm '+(campoTab==="aval"?"":"sec")+'" onclick="setCampoTab(\'aval\')">📐 Avaliação (PTAM)</button>':'')+'</div>';
+  if(campoTab==="aval" && !ehMaster()) campoTab="crm";
   return tabs+(campoTab==="agenda"?campoAgendaHtml():(campoTab==="aval"?avalListaHtml():campoCrmHtml()));
 }
 function campoCrmHtml(){
@@ -1713,7 +1733,7 @@ function campoVerHtml(){
     (esc_?(o.arquivado?'<button class="btn sm sec" onclick="arquivarCampo(\''+o.id+'\',false)">Desarquivar</button>':'<button class="btn sm sec" onclick="arquivarCampo(\''+o.id+'\',true)">🗄️ Arquivar</button>'):'')+
     '</div>'+(o.retrabalhoCount?'<div class="muted small" style="margin-top:6px">Retornos de retrabalho: '+o.retrabalhoCount+'</div>':'')+'</div>';
   h+='<div class="card"><h2>Ordem</h2>'+kv("Parceiro de campo",o.campoParceiro)+kv("Data agendada",o.dataAgendada?brData(o.dataAgendada):"")+kv("Serviço",o.servico)+kv("Cliente",o.cliente.nome)+kv("WhatsApp cliente",o.cliente.fone)+'</div>';
-  h+='<div class="card"><h2>Imóvel</h2>'+kv("Denominação",o.imovel.denominacao)+kv("Matrícula",o.imovel.matricula)+kv("Município/UF",o.imovel.municipioUf)+kv("Área",o.imovel.area?(o.imovel.area+"@sistema ha"):"")+'</div>';
+  h+='<div class="card"><h2>Imóvel</h2>'+kv("Denominação",o.imovel.denominacao)+kv("Matrícula",o.imovel.matricula)+kv("Município/UF",o.imovel.municipioUf)+kv("Área",o.imovel.area?(o.imovel.area+" ha"):"")+'</div>';
   if(o.detalhes) h+='<div class="card"><h2>Detalhes</h2><p style="white-space:pre-wrap">'+esc(o.detalhes)+'</p></div>';
   // agenda
   h+='<div class="card"><h2>📅 Agenda</h2>'+(o.dataAgendada?('<div class="row" style="gap:8px;flex-wrap:wrap"><a class="btn sm" href="'+gcalLink(o)+'" target="_blank">Adicionar ao Google Agenda</a><button class="btn sm sec" onclick="baixarICS(\''+o.id+'\')">⬇️ Exportar .ics</button></div>'):'<div class="muted small">Sem data agendada.</div>')+'</div>';
@@ -1739,15 +1759,15 @@ function campoVerHtml(){
   return h;
 }
 function mudarStatusCampo(id,st){ var o=campoById(id); if(!o||o.status===st)return; o.status=st; registrarMov(o,"Status: "+st); salvarCampo(); render(); }
-function marcarRetrabalho(id){ var o=campoById(id); if(!o)return; var m=prompt("O que precisa refazer? (motivo do retrabalho)",""); if(m==null)return; o.status="Retrabalho"; o.retrabalhoCount=(o.retrabalhoCount||0)+1; registrarMov(o,"RETRABALHO ("+o.retrabalhoCount+"@sistemax): "+m); salvarCampo(); render(); setTimeout(function(){ if(confirm("Avisar o parceiro pelo WhatsApp?")) avisarCampo(id,'parceiro'); },150); }
+function marcarRetrabalho(id){ var o=campoById(id); if(!o)return; var m=prompt("O que precisa refazer? (motivo do retrabalho)",""); if(m==null)return; o.status="Retrabalho"; o.retrabalhoCount=(o.retrabalhoCount||0)+1; registrarMov(o,"RETRABALHO ("+o.retrabalhoCount+"x): "+m); salvarCampo(); render(); setTimeout(function(){ if(confirm("Avisar o parceiro pelo WhatsApp?")) avisarCampo(id,'parceiro'); },150); }
 function arquivarCampo(id,val){ var o=campoById(id); if(!o)return; o.arquivado=val; registrarMov(o,val?"Arquivada":"Desarquivada"); salvarCampo(); render(); }
-function addMovCampo(id){ var o=campoById(id); if(!o)return; var el=document.getElementById("movCampoTxt"); var t=el?el.value.trim():""; if(!t){alert("Escreva o andamento.");return;} registrarMov(o,t); salvarCampo(); render(); setTimeout(function(){ if(confirm("Avisar o "+(ehEscritorioCampo()?"parceiro":"escritório")+"@sistema pelo WhatsApp?")){ ehEscritorioCampo()?avisarCampo(id,'parceiro'):avisarCampo(id,'escritorio'); } },150); }
+function addMovCampo(id){ var o=campoById(id); if(!o)return; var el=document.getElementById("movCampoTxt"); var t=el?el.value.trim():""; if(!t){alert("Escreva o andamento.");return;} registrarMov(o,t); salvarCampo(); render(); setTimeout(function(){ if(confirm("Avisar o "+(ehEscritorioCampo()?"parceiro":"escritório")+" pelo WhatsApp?")){ ehEscritorioCampo()?avisarCampo(id,'parceiro'):avisarCampo(id,'escritorio'); } },150); }
 function addEntregaCampo(id){ var o=campoById(id); if(!o)return; var nome=prompt("Nome da entrega (ex.: Levantamento.dwg / Relatório.pdf):"); if(!nome)return; var link=prompt("Link de download (Drive):","")||""; if(!o.entregas)o.entregas=[]; o.entregas.push({nome:nome,link:link,quando:new Date().toISOString(),quem:user.nome}); registrarMov(o,"Entrega anexada: "+nome); if(o.status==="Em execução"||o.status==="Campo executado")o.status="Processando"; salvarCampo(); render(); setTimeout(function(){ if(confirm("Avisar o escritório que há entrega?")) avisarCampo(id,'escritorio'); },150); }
 function setValorCampo(id){ var o=campoById(id); if(!o)return; var el=document.getElementById("valCampoInp"); o.valorCampo=el?el.value:o.valorCampo; registrarMov(o,"Valor do campo informado: "+o.valorCampo); salvarCampo(); alert("Valor salvo (entra em Pagamentos a Terceiros na sincronização com seu gerenciador)."); render(); }
 function custosCardHtml(o){
   var total=(o.custos||[]).reduce(function(s,c){return s+(num(c.valor)||0);},0);
   var lista=(o.custos||[]).length?o.custos.map(function(c,i){
-    var det=c.tipo==="Deslocamento"?(((c.origem||c.destino)?(' · '+esc(c.origem||"?")+"@sistema→"+esc(c.destino||"?")):'')+(c.km?(' · '+esc(c.km)+' km'):'')):'';
+    var det=c.tipo==="Deslocamento"?(((c.origem||c.destino)?(' · '+esc(c.origem||"?")+"→"+esc(c.destino||"?")):'')+(c.km?(' · '+esc(c.km)+' km'):'')):'';
     return '<div class="kv"><span><b>'+esc(c.tipo)+'</b> '+esc(c.descricao||"")+det+' <span class="muted small">'+brData(c.data)+'</span></span><span>'+fmtBR(num(c.valor))+' <button class="btn sm sec" onclick="delCustoCampo(\''+o.id+'\','+i+')">✕</button></span></div>';
   }).join(""):'<div class="muted small">Nenhum custo lançado.</div>';
   var d=custoDraft, desl=(d.tipo==="Deslocamento");
@@ -1767,12 +1787,12 @@ function custosCardHtml(o){
 function setCustoDraft(k,v){ custoDraft[k]=v; }
 function addCustoCampo(id){ var o=campoById(id); if(!o)return; if(num(custoDraft.valor)==null && !(custoDraft.descricao||"").trim()){ alert("Informe o valor ou a descrição do custo."); return; }
   if(!o.custos)o.custos=[]; o.custos.push(Object.assign({quem:user.nome,quando:new Date().toISOString()},custoDraft));
-  registrarMov(o,"Custo lançado: "+custoDraft.tipo+"@sistema "+fmtBR(num(custoDraft.valor)));
+  registrarMov(o,"Custo lançado: "+custoDraft.tipo+" "+fmtBR(num(custoDraft.valor)));
   custoDraft={tipo:"Deslocamento",descricao:"",valor:"",data:hoje(),km:"",origem:"",destino:""};
   salvarCampo(); render(); }
 function delCustoCampo(id,i){ var o=campoById(id); if(!o)return; o.custos.splice(i,1); salvarCampo(); render(); }
 function avisarCampo(id,quem){ var o=campoById(id); if(!o)return;
-  var msg="*"+(cfg.brand||"Sistema")+"@sistema* — Serviço de campo\n📋 "+(o.cliente.nome||o.imovel.denominacao||"ordem")+"@sistema\n📌 Status: "+o.status+(o.dataAgendada?("\n📅 "+brData(o.dataAgendada)):"")+(o.servico?("\n🛠️ "+o.servico):"");
+  var msg="*"+(cfg.brand||"Sistema")+"* — Serviço de campo\n📋 "+(o.cliente.nome||o.imovel.denominacao||"ordem")+"\n📌 Status: "+o.status+(o.dataAgendada?("\n📅 "+brData(o.dataAgendada)):"")+(o.servico?("\n🛠️ "+o.servico):"");
   var fone = quem==="parceiro"? foneDir(o.campoParceiro) : (quem==="cliente"? (o.cliente&&o.cliente.fone) : donoFone());
   if(quem==="escritorio"&&!fone){ alert("O escritório ainda não configurou o WhatsApp (Parceiros → Meu WhatsApp).");return; }
   abrirWa2(fone,msg);
@@ -1790,7 +1810,7 @@ function eventosUnificados(){
     if(podeVerCampo(o)&&!o.arquivado&&o.dataAgendada){
       var nome=(o.cliente&&o.cliente.nome)||(o.imovel&&o.imovel.denominacao)||'Ordem';
       ev.push({data:o.dataAgendada, hora:o.horaAgendada||'', tipo:'campo', id:o.id, cls:campoCalCls(o.status), ico:'📋',
-        label:nome, sub:(o.servico||''), status:o.status, onclick:"verCampo('"+o.id+"@sistema')",
+        label:nome, sub:(o.servico||''), status:o.status, onclick:"verCampo('"+o.id+"')",
         title:nome+' · '+(o.servico||'')+' · '+o.status});
     }
   });
@@ -1798,7 +1818,7 @@ function eventosUnificados(){
     if(participanteC(c)&&c.status!=="Recusado"&&c.status!=="Cancelado"&&c.data){
       var t=c.titulo||convLabelC(c);
       ev.push({data:c.data, hora:c.hora||'', tipo:'comprom', id:c.id, cls:comCalCls(c.status), ico:'📆',
-        label:t, sub:(c.local||''), status:c.status, onclick:"verComprom('"+c.id+"@sistema')",
+        label:t, sub:(c.local||''), status:c.status, onclick:"verComprom('"+c.id+"')",
         title:t+' · '+c.status});
     }
   });
@@ -1809,7 +1829,7 @@ function eventosUnificados(){
       if(!pr.data)return;
       ev.push({data:pr.data, hora:pr.hora||'', tipo:'providencia', id:p.id, cls:(pr.feito?'ok':'az'), ico:'🗓️',
         label:(pr.texto||'Providência'), sub:(p.nome||(p.imovel&&p.imovel.denominacao)||''), status:(pr.feito?'concluída':'agendada'),
-        onclick:"verProj('"+p.id+"@sistema')", title:(pr.texto||'')+' · '+(p.nome||'')});
+        onclick:"verProj('"+p.id+"')", title:(pr.texto||'')+' · '+(p.nome||'')});
     });
   });
   return ev;
@@ -1852,14 +1872,14 @@ function campoAgendaHtml(){
 function gcalLink(o){
   var text=encodeURIComponent("Campo: "+(o.cliente.nome||o.imovel.denominacao||"Serviço"));
   var d=(o.dataAgendada||"").replace(/-/g,"");
-  var dates=d?("&dates="+d+"@sistema/"+d):"";
+  var dates=d?("&dates="+d+"/"+d):"";
   var det=encodeURIComponent((o.servico||"")+(o.detalhes?(" — "+o.detalhes):""));
   var loc=encodeURIComponent(o.imovel.municipioUf||"");
-  return "https://calendar.google.com/calendar/render?action=TEMPLATE&text="+text+dates+"@sistema&details="+det+"@sistema&location="+loc;
+  return "https://calendar.google.com/calendar/render?action=TEMPLATE&text="+text+dates+"&details="+det+"&location="+loc;
 }
 function baixarICS(id){ var o=campoById(id); if(!o)return; var d=(o.dataAgendada||"").replace(/-/g,""); if(!d){alert("Ordem sem data agendada.");return;}
-  var ics="BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Sistema//Campo//PT\r\nBEGIN:VEVENT\r\nUID:campo-"+o.id+"@sistema\r\nDTSTART;VALUE=DATE:"+d+"\r\nDTEND;VALUE=DATE:"+d+"\r\nSUMMARY:Campo: "+(o.cliente.nome||o.imovel.denominacao||"Servico")+"\r\nDESCRIPTION:"+((o.servico||"")+" "+(o.detalhes||"")).replace(/[\r\n]+/g," ")+"\r\nLOCATION:"+(o.imovel.municipioUf||"")+"\r\nEND:VEVENT\r\nEND:VCALENDAR";
-  var b=new Blob([ics],{type:"text/calendar"}); var a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download="campo_"+((o.cliente.nome||o.imovel.denominacao||"ordem").replace(/[^a-z0-9]+/gi,"_"))+"@sistema.ics"; a.click(); }
+  var ics="BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Sistema//Campo//PT\r\nBEGIN:VEVENT\r\nUID:campo-"+o.id+"\r\nDTSTART;VALUE=DATE:"+d+"\r\nDTEND;VALUE=DATE:"+d+"\r\nSUMMARY:Campo: "+(o.cliente.nome||o.imovel.denominacao||"Servico")+"\r\nDESCRIPTION:"+((o.servico||"")+" "+(o.detalhes||"")).replace(/[\r\n]+/g," ")+"\r\nLOCATION:"+(o.imovel.municipioUf||"")+"\r\nEND:VEVENT\r\nEND:VCALENDAR";
+  var b=new Blob([ics],{type:"text/calendar"}); var a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download="campo_"+((o.cliente.nome||o.imovel.denominacao||"ordem").replace(/[^a-z0-9]+/gi,"_"))+".ics"; a.click(); }
 
 /* =========================================================================
    VISTORIA DE AVALIAÇÃO (PTAM) — sub-aba do módulo Campo
@@ -1876,7 +1896,7 @@ function podeVerAval(a){ return ehEscritorioCampo()||eqNome(a.vistoriador,user.n
 function novoAval(){ return {id:uid(),criadoEm:new Date().toISOString(),vistoriador:user.nome,status:"Em vistoria",
   solicitante:"", finalidade:"Determinar o valor de mercado e liquidez do imóvel para fins de garantia de operações de crédito.",
   imovel:{matricula:"",cartorio:"",comarca:"",proprietario:"",areaTotalM2:"",localizacao:"",confrontacoes:"",roteiroAcesso:"",descricao:"",usoArea:"",car:"",municipioUf:""},
-  coordenadas:[], amostra:[], homogeneizacao:"Para a avaliação do imóvel foi utilizado o método comparativo direto com homogeneização por fatores, conforme a NBR-14653. O imóvel avaliando é comparado com imóveis de características semelhantes, cujos valores unitários (R$/m²) são ajustados por fatores que tornam a amostra homogênea. O saneamento amostral utilizou o Critério de Chauvenet e o tratamento estatístico a Teoria das Pequenas Amostras (n<30) com distribuição 't' de Student, confiança de 80%, conforme a Norma.",
+  coordenadas:[], amostra:[], avaliando:{topo:"plana",acesso:"pav",loc:"privileg"}, homogeneizacao:"Para a avaliação do imóvel foi utilizado o método comparativo direto com homogeneização por fatores, conforme a NBR-14653. O imóvel avaliando é comparado com imóveis de características semelhantes, cujos valores unitários (R$/m²) são ajustados por fatores que tornam a amostra homogênea. O saneamento amostral utilizou o Critério de Chauvenet e o tratamento estatístico a Teoria das Pequenas Amostras (n<30) com distribuição 't' de Student, confiança de 80%, conforme a Norma.",
   calc:{fatorLiquidez:"0,95"}, valorMercado:"", valorLiquidez:"",
   responsavel:Object.assign({},RESP_PADRAO), dataLaudo:hoje(), fotos:[], movimentos:[], arquivado:false, _novo:true }; }
 
@@ -1933,28 +1953,53 @@ function addCoord(){ if(!editAval.coordenadas)editAval.coordenadas=[]; editAval.
 function setCoord(i,k,v){ editAval.coordenadas[i][k]=v; }
 function delCoord(i){ editAval.coordenadas.splice(i,1); renderMain(); }
 function avalPesquisaHtml(a){
-  var c=calcAval(a);
-  var h='<div class="card"><h2>Amostra de imóveis comparativos ('+(a.amostra||[]).length+')</h2>'+
+  var c=calcAval(a); var av=a.avaliando||{};
+  function selFat(scope,tab,key,val){ var oc=(scope==="av")?("setAval('avaliando."+key+"',this.value);renderMain()"):("setAmostra("+scope+",'"+key+"',this.value);renderMain()");
+    return '<select onchange="'+oc+'" style="width:100%;padding:7px;border:1px solid #cfd8e3;border-radius:8px;background:#fff">'+tab.map(function(o){return '<option value="'+o.k+'"'+(val===o.k?' selected':'')+'>'+o.l+' — '+o.c.toFixed(2)+'</option>';}).join("")+'</select>'; }
+  var h='<div class="card"><h2>🎯 Características do imóvel avaliando (paradigma dos fatores)</h2>'+
+    '<p class="muted small">Cada fator do elemento = coeficiente do avaliando ÷ coeficiente do elemento (limitado a 0,40–2,50), conforme a NBR-14653.</p>'+
+    '<div class="grid g3" style="margin-top:6px">'+
+      '<div><label class="f">Localização (F1)</label>'+selFat("av",FAT_LOC,"loc",av.loc)+'</div>'+
+      '<div><label class="f">Acesso (F2)</label>'+selFat("av",FAT_ACESSO,"acesso",av.acesso)+'</div>'+
+      '<div><label class="f">Topografia (F3)</label>'+selFat("av",FAT_TOPO,"topo",av.topo)+'</div>'+
+    '</div></div>';
+  h+='<div class="card"><h2>Amostra de imóveis comparativos ('+(a.amostra||[]).length+')</h2>'+
     ((a.amostra||[]).length?a.amostra.map(function(e,i){
-      var unit=(num(e.valor)&&num(e.areaM2))?(num(e.valor)/num(e.areaM2)):null;
+      var el=(c.elementos&&c.elementos[i])||{};
       return '<div class="card" style="margin:0 0 8px;background:var(--surface2,#f7f9fc)"><div class="row" style="justify-content:space-between"><b>IMÓVEL '+(i+1<10?"0":"")+(i+1)+'</b><button class="btn sm sec" onclick="delAmostra('+i+')">✕</button></div>'+
         '<div class="grid g2">'+
         '<div><label class="f">Descrição / localização</label><input value="'+esc(e.descricao)+'" oninput="setAmostra('+i+',\'descricao\',this.value)"></div>'+
         '<div><label class="f">Fonte</label><input value="'+esc(e.fonte)+'" oninput="setAmostra('+i+',\'fonte\',this.value)"></div>'+
         '<div><label class="f">Área (m²)</label><input value="'+esc(e.areaM2)+'" oninput="setAmostra('+i+',\'areaM2\',this.value)"></div>'+
         '<div><label class="f">Valor (R$)</label><input value="'+esc(e.valor)+'" oninput="setAmostra('+i+',\'valor\',this.value)"></div>'+
-        '</div><div style="margin-top:6px"><label class="f">Link do anúncio</label><input value="'+esc(e.link)+'" oninput="setAmostra('+i+',\'link\',this.value)"></div>'+
-        (unit?'<div class="muted small" style="margin-top:4px">Unitário: '+fmtBR(unit)+'/m²</div>':'')+'</div>';
+        '</div>'+
+        '<div class="grid g3" style="margin-top:6px">'+
+          '<div><label class="f">Localização</label>'+selFat(i,FAT_LOC,"loc",e.loc)+'</div>'+
+          '<div><label class="f">Acesso</label>'+selFat(i,FAT_ACESSO,"acesso",e.acesso)+'</div>'+
+          '<div><label class="f">Topografia</label>'+selFat(i,FAT_TOPO,"topo",e.topo)+'</div>'+
+        '</div>'+
+        '<div style="margin-top:6px"><label class="f">Link do anúncio</label><input value="'+esc(e.link)+'" oninput="setAmostra('+i+',\'link\',this.value)"></div>'+
+        (el.raw!=null?'<div class="muted small" style="margin-top:6px">Unitário bruto: '+fmt2(el.raw)+'/m² &nbsp;·&nbsp; F1 '+fmt2(el.f1)+' × F2 '+fmt2(el.f2)+' × F3 '+fmt2(el.f3)+' → <b>Homogeneizado: '+fmt2(el.xi)+'/m²</b></div>':'')+'</div>';
     }).join(""):'<div class="muted small">Adicione os elementos da amostra (mín. 2 para calcular).</div>')+
     '<div style="height:8px"></div><button class="btn sm" onclick="addAmostra()">➕ Adicionar imóvel à amostra</button></div>'+
     txtAv("Homogeneização (texto do método)","homogeneizacao",a.homogeneizacao);
-  // cálculo
-  h+='<div class="card"><h2>💹 Cálculo (média saneada — Chauvenet)</h2>';
+  // ===== quadro estatístico NBR (fiel à memória de cálculo) =====
+  h+='<div class="card"><h2>💹 Tratamento estatístico (NBR-14653 · pequenas amostras · 80%)</h2>';
   if(c.unitM2==null){ h+='<div class="muted small">Preencha ao menos 2 imóveis com área e valor.</div>'; }
   else {
-    h+='<div class="kv"><span>Elementos válidos</span><span>'+c.n+' (usados '+c.saneada.length+', removidos '+c.removidos.length+')</span></div>'+
-       '<div class="kv"><span>Unitário médio saneado</span><span>'+fmtBR(c.unitM2)+'/m² · '+fmtBR(c.unitHa)+'/ha</span></div>'+
-       '<div class="kv"><span>Área do imóvel</span><span>'+(c.areaHa!=null?c.areaHa.toLocaleString("pt-BR")+"@sistema ha":"— (preencha área total m²)")+'</span></div>'+
+    h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;margin:6px 0">'+
+       '<tr style="background:var(--surface2,#eef2f8)"><th style="padding:5px;text-align:left">#</th><th style="padding:5px">Bruto R$/m²</th><th style="padding:5px">F1</th><th style="padding:5px">F2</th><th style="padding:5px">F3</th><th style="padding:5px">Xi homog.</th><th style="padding:5px">d/S</th><th style="padding:5px">Chauvenet</th></tr>';
+    (c.elementos||[]).forEach(function(el,i){ if(el.raw==null)return;
+      h+='<tr style="border-top:1px solid #e3e9f2"><td style="padding:5px">'+(i+1)+'</td><td style="padding:5px;text-align:center">'+fmt2(el.raw)+'</td><td style="padding:5px;text-align:center">'+fmt2(el.f1)+'</td><td style="padding:5px;text-align:center">'+fmt2(el.f2)+'</td><td style="padding:5px;text-align:center">'+fmt2(el.f3)+'</td><td style="padding:5px;text-align:center"><b>'+fmt2(el.xi)+'</b></td><td style="padding:5px;text-align:center">'+fmt2(el.d)+'</td><td style="padding:5px;text-align:center">'+(el.ok?'✔':'✕ excl.')+'</td></tr>'; });
+    h+='</table></div>';
+    h+='<div class="kv"><span>Média homogeneizada (X)</span><span><b>'+fmt2(c.X)+'</b>/m²</span></div>'+
+       '<div class="kv"><span>Desvio padrão (S)</span><span>'+fmt2(c.S)+'</span></div>'+
+       '<div class="kv"><span>Chauvenet — valor crítico ('+c.nSan+' elementos)</span><span>'+fmt2(c.VC)+(c.removidos.length?(' · '+c.removidos.length+' excluído(s)'):'')+'</span></div>'+
+       '<div class="kv"><span>t de Student (80%, '+(c.nSan-1)+' g.l.)</span><span>'+fmt2(c.tc)+'</span></div>'+
+       '<div class="kv"><span>Intervalo de confiança (80%)</span><span>'+fmtBR(c.Li)+' a '+fmtBR(c.Ls)+'/m²</span></div>'+
+       '<div class="kv"><span>Campo de arbítrio (±10%)</span><span>'+fmtBR(c.campoLi)+' a '+fmtBR(c.campoLs)+'/m²</span></div>'+
+       '<div class="kv"><span>Valor unitário (média no campo de arbítrio)</span><span><b>'+fmtBR(c.unitCampo)+'</b>/m² · '+fmtBR(c.unitHa)+'/ha</span></div>'+
+       '<div class="kv"><span>Área do imóvel</span><span>'+(c.areaHa!=null?c.areaHa.toLocaleString("pt-BR")+" ha":"— (preencha área total m²)")+'</span></div>'+
        '<div class="kv"><span><b>Valor de mercado sugerido</b></span><span><b>'+fmtBR(c.valorMercado)+'</b></span></div>'+
        '<div class="grid g2" style="margin-top:8px">'+inpAv("Fator de liquidez (ex.: 0,95)","calc.fatorLiquidez",a.calc.fatorLiquidez)+'<div class="kv"><span>Liquidez sugerida</span><span>'+fmtBR(c.valorLiquidez)+'</span></div></div>';
   }
@@ -1964,23 +2009,66 @@ function avalPesquisaHtml(a){
      '<p class="muted small" style="margin-top:6px">O valor final é seu — o cálculo é uma sugestão. Ajuste conforme sua análise técnica.</p></div>';
   return h;
 }
-function addAmostra(){ if(!editAval.amostra)editAval.amostra=[]; editAval.amostra.push({descricao:"",fonte:"",areaM2:"",valor:"",link:""}); renderMain(); }
+function addAmostra(){ if(!editAval.amostra)editAval.amostra=[]; editAval.amostra.push({descricao:"",fonte:"",areaM2:"",valor:"",link:"",topo:"plana",acesso:"pav",loc:"privileg"}); renderMain(); }
 function setAmostra(i,k,v){ editAval.amostra[i][k]=v; if(k==="areaM2"||k==="valor") renderMain(); }
 function delAmostra(i){ editAval.amostra.splice(i,1); renderMain(); }
+/* ===== NBR-14653: fatores de homogeneização + Teoria das Pequenas Amostras (t de Student, 80%) ===== */
+// Coeficientes pré-ajustados p/ imóveis rurais (Serra Catarinense) + justificativa automática por opção.
+var FAT_TOPO=[
+ {k:"plana",l:"Plana (0–3%)",c:1.00,j:"topografia plana, com plena aptidão à mecanização agrícola"},
+ {k:"leve",l:"Levemente ondulada (3–8%)",c:0.95,j:"topografia levemente ondulada, com boa aptidão à mecanização e drenagem natural"},
+ {k:"ondulada",l:"Ondulada (8–20%)",c:0.85,j:"topografia ondulada, com restrições parciais à mecanização, exigindo práticas de conservação do solo"},
+ {k:"acidentada",l:"Acidentada (>20%)",c:0.70,j:"topografia acidentada, com severas limitações ao tráfego de maquinário, restrita a pastejo extensivo ou florestamento"}];
+var FAT_ACESSO=[
+ {k:"pav",l:"Pavimentado",c:1.00,j:"acesso por via pavimentada, garantindo escoamento logístico o ano todo"},
+ {k:"terraBoa",l:"Terra em boa conservação",c:0.90,j:"acesso por estrada de terra em boas condições de tráfego, com manutenção periódica"},
+ {k:"terraRuim",l:"Terra precária",c:0.75,j:"acesso por estrada de terra precária, com dificuldade de tráfego em períodos chuvosos, elevando o custo logístico"}];
+var FAT_LOC=[
+ {k:"privileg",l:"Privilegiada",c:1.00,j:"localização privilegiada, próxima a centros de consumo e escoamento, com alta valorização regional"},
+ {k:"tipica",l:"Típica de interior",c:0.85,j:"localização típica de zona rural interiorana, com distâncias moderadas aos centros de apoio"},
+ {k:"isolada",l:"Isolada",c:0.70,j:"localização isolada, distante de centros logísticos e de abastecimento, com reflexo no valor de mercado"}];
+function fatItem(tab,k){ for(var i=0;i<tab.length;i++){ if(tab[i].k===k) return tab[i]; } return tab[0]; }
+function fatorRel(cav,cam){ var f=cav/cam; if(!isFinite(f)||f<=0)f=1; return Math.max(0.40,Math.min(2.50,Math.round(f*100)/100)); }
+// t de Student — percentis para 80% de confiança (bicaudal), por graus de liberdade
+var T80={1:3.078,2:1.886,3:1.638,4:1.533,5:1.476,6:1.440,7:1.415,8:1.397,9:1.383,10:1.372,11:1.363,12:1.356,13:1.350,14:1.345,15:1.341,16:1.337,17:1.333,18:1.330,19:1.328,20:1.325,21:1.323,22:1.321,23:1.319,24:1.318,25:1.316,26:1.315,27:1.314,28:1.313,29:1.311};
+function t80(gl){ gl=Math.round(gl); if(gl<1)return T80[1]; if(T80[gl])return T80[gl]; if(gl>=29)return 1.311; return 1.34; }
+function fmt2(x){ return (x==null||isNaN(x))?"—":Number(x).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function chauvenetDmax(n){ var t={2:1.15,3:1.38,4:1.54,5:1.65,6:1.73,7:1.80,8:1.86,9:1.91,10:1.96,12:2.03,15:2.13,20:2.24,25:2.33,30:2.39};
   if(t[n])return t[n]; if(n<2)return 999; if(n>30)return 2.5; var ks=Object.keys(t).map(Number).sort(function(a,b){return a-b;}), lo=ks[0],hi=ks[ks.length-1];
   for(var i=0;i<ks.length-1;i++){ if(n>=ks[i]&&n<=ks[i+1]){lo=ks[i];hi=ks[i+1];break;} } return t[lo]+(t[hi]-t[lo])*((n-lo)/(hi-lo)); }
 function calcAval(a){
-  var els=(a.amostra||[]).map(function(e){ var ar=num(e.areaM2), v=num(e.valor); return (ar&&v&&ar>0)?(v/ar):null; }).filter(function(x){return x!=null&&x>0;});
-  if(els.length<2) return {n:els.length,unitM2:null,saneada:[],removidos:[]};
   function mean(x){return x.reduce(function(s,v){return s+v;},0)/x.length;}
-  var m=mean(els), s=Math.sqrt(els.reduce(function(t,v){return t+(v-m)*(v-m);},0)/(els.length-1)), dmax=chauvenetDmax(els.length);
-  var saneada=[],removidos=[]; els.forEach(function(v){ if(s>0&&Math.abs(v-m)/s>dmax)removidos.push(v); else saneada.push(v); });
-  if(!saneada.length)saneada=els.slice();
-  var mm=mean(saneada), unitHa=mm*10000, areaHa=num(a.imovel.areaTotalM2)?num(a.imovel.areaTotalM2)/10000:null;
+  var av=a.avaliando||{};
+  var avT=fatItem(FAT_TOPO,av.topo).c, avA=fatItem(FAT_ACESSO,av.acesso).c, avL=fatItem(FAT_LOC,av.loc).c;
+  // 1) por elemento: unitário bruto (R$/m²) e homogeneização Xi = bruto × F1(loc) × F2(acesso) × F3(topo)
+  var elementos=(a.amostra||[]).map(function(e){
+    var ar=num(e.areaM2), v=num(e.valor), raw=(ar&&v&&ar>0)?(v/ar):null;
+    if(raw==null) return {raw:null};
+    var f1=fatorRel(avL,fatItem(FAT_LOC,e.loc).c), f2=fatorRel(avA,fatItem(FAT_ACESSO,e.acesso).c), f3=fatorRel(avT,fatItem(FAT_TOPO,e.topo).c);
+    return {raw:raw,f1:f1,f2:f2,f3:f3,xi:raw*f1*f2*f3};
+  });
+  var validos=elementos.filter(function(x){return x.raw!=null;});
+  if(validos.length<2) return {n:validos.length,unitM2:null,saneada:[],removidos:[],elementos:elementos};
+  var xs=validos.map(function(x){return x.xi;});
+  // 2) Critério de Chauvenet sobre os valores homogeneizados
+  var m=mean(xs), s=Math.sqrt(xs.reduce(function(t,v){return t+(v-m)*(v-m);},0)/(xs.length-1)), VC=chauvenetDmax(xs.length);
+  validos.forEach(function(x){ x.d=s>0?Math.abs(x.xi-m)/s:0; x.ok=!(s>0&&x.d>VC); });
+  var saneadaEl=validos.filter(function(x){return x.ok;}); if(!saneadaEl.length){ saneadaEl=validos.slice(); saneadaEl.forEach(function(x){x.ok=true;}); }
+  var removidos=validos.filter(function(x){return !x.ok;}).map(function(x){return x.xi;});
+  var saneada=saneadaEl.map(function(x){return x.xi;}), n2=saneada.length;
+  // 3) Teoria das Pequenas Amostras — intervalo de confiança 80% (t de Student, gl = n-1)
+  var X=mean(saneada), S=n2>1?Math.sqrt(saneada.reduce(function(t,v){return t+(v-X)*(v-X);},0)/(n2-1)):0;
+  var tc=t80(n2-1), amp=n2>1?tc*S/Math.sqrt(n2-1):0, Li=X-amp, Ls=X+amp;
+  // 4) Campo de arbítrio ±10% e valor unitário = média dos elementos dentro do campo
+  var campoLi=X*0.90, campoLs=X*1.10;
+  var dentroCampo=saneada.filter(function(v){return v>=campoLi&&v<=campoLs;});
+  var unitCampo=dentroCampo.length?mean(dentroCampo):X, unitHa=unitCampo*10000;
+  var areaHa=num(a.imovel.areaTotalM2)?num(a.imovel.areaTotalM2)/10000:null;
   var fl=num(a.calc&&a.calc.fatorLiquidez); if(fl==null||fl<=0)fl=0.95; if(fl>1)fl=fl/100;
   var vM=areaHa!=null?unitHa*areaHa:null, vL=vM!=null?vM*fl:null;
-  return {n:els.length,unitM2:mm,unitHa:unitHa,saneada:saneada,removidos:removidos,areaHa:areaHa,valorMercado:vM,valorLiquidez:vL,fatorLiq:fl};
+  return {n:validos.length,nSan:n2,elementos:elementos,saneadaEl:saneadaEl,saneada:saneada,removidos:removidos,
+    X:X,S:S,VC:VC,tc:tc,Li:Li,Ls:Ls,campoLi:campoLi,campoLs:campoLs,dentroCampo:dentroCampo,
+    unitCampo:unitCampo,unitM2:unitCampo,unitHa:unitHa,areaHa:areaHa,valorMercado:vM,valorLiquidez:vL,fatorLiq:fl};
 }
 function avalFotosHtml(a){
   var h='<div class="card"><h2>📸 Fotos da vistoria ('+(a.fotos||[]).length+')</h2>'+
@@ -1998,7 +2086,7 @@ function addFotoAval(camera){
   var inp=document.createElement("input"); inp.type="file"; inp.accept="image/*"; inp.multiple=true; if(camera)inp.setAttribute("capture","environment");
   inp.onchange=function(e){ var files=e.target.files; if(!files||!files.length)return;
     function push(coords){ Array.prototype.forEach.call(files,function(f){ var r=new FileReader(); r.onload=function(ev){
-        var gps=coords?(Number(coords.latitude).toFixed(6)+"@sistema, "+Number(coords.longitude).toFixed(6)):"";
+        var gps=coords?(Number(coords.latitude).toFixed(6)+", "+Number(coords.longitude).toFixed(6)):"";
         if(!editAval.fotos)editAval.fotos=[]; editAval.fotos.push({nome:f.name,dataURI:ev.target.result,legenda:"",gps:gps,quando:new Date().toISOString()}); renderMain();
       }; r.readAsDataURL(f); }); }
     if(camera&&navigator.geolocation){ navigator.geolocation.getCurrentPosition(function(p){push(p.coords);},function(){push(null);},{timeout:8000,enableHighAccuracy:true}); }
@@ -2035,7 +2123,7 @@ function baixarDocWord(nomeArq, interno){
   var full='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>'+esc(nomeArq)+'</title>'+
     '<style>@page{size:A4;margin:2cm} body{font-family:\'Times New Roman\',serif;font-size:12pt;color:#000;line-height:1.4} h1{font-size:14pt;text-align:center;margin:0 0 12pt} h2{font-size:12pt;margin:14pt 0 4pt} p{margin:4pt 0;text-align:justify} table{border-collapse:collapse;width:100%;margin:6pt 0} td,th{border:1px solid #000;padding:4px;font-size:10pt;vertical-align:top} .sig{margin-top:48pt;text-align:center} .muted{color:#333;font-size:10pt} img{max-width:100%;height:auto}</style></head><body>'+interno+'</body></html>';
   var blob=new Blob(['﻿'+full],{type:'application/msword'});
-  var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=nomeArq+"@sistema.doc"; a.click();
+  var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=nomeArq+".doc"; a.click();
 }
 function gerarLaudoWord(id){
   var a=avalById(id)||editAval; var c=calcAval(a);
@@ -2058,6 +2146,23 @@ function gerarLaudoWord(id){
   (a.amostra||[]).forEach(function(e,i){ var unit=(num(e.valor)&&num(e.areaM2))?(num(e.valor)/num(e.areaM2)):null;
     h+=P('<b>IMÓVEL '+(i+1<10?"0":"")+(i+1)+'</b><br>'+esc(e.descricao||"")+'<br>Área: '+esc(e.areaM2||"—")+' m²  ·  Valor: '+(num(e.valor)!=null?fmtBR(num(e.valor)):esc(e.valor||"—"))+(unit?('  ·  Unitário: '+fmtBR(unit)+'/m²'):'')+(e.fonte?('  ·  Fonte: '+esc(e.fonte)):'')+(e.link?('<br>Link: '+esc(e.link)):'')); });
   h+=P('<b>4.2)</b> Homogeneização: '+esc(a.homogeneizacao||""));
+  // ---- caracterização do avaliando + justificativa automática dos fatores ----
+  var av=a.avaliando||{}; var jL=fatItem(FAT_LOC,av.loc), jA=fatItem(FAT_ACESSO,av.acesso), jT=fatItem(FAT_TOPO,av.topo);
+  h+=P('<b>4.3)</b> Caracterização do imóvel avaliando (paradigma): '+esc(jL.j)+'; '+esc(jA.j)+'; '+esc(jT.j)+'. Os coeficientes adotados são: localização '+fmt2(jL.c)+', acesso '+fmt2(jA.c)+' e topografia '+fmt2(jT.c)+'.');
+  // ---- Seção 5: tratamento estatístico (só quando há cálculo) ----
+  if(c.unitM2!=null){
+    h+='<h2>5) Tratamento estatístico (Teoria das Pequenas Amostras — NBR-14653)</h2>';
+    h+=P('Os valores unitários foram homogeneizados pelos fatores F1 (localização), F2 (acesso) e F3 (topografia), obtidos pela razão entre o coeficiente do imóvel avaliando e o do respectivo elemento, limitada ao intervalo de 0,40 a 2,50.');
+    h+='<table><tr><th>Elemento</th><th>Unitário bruto (R$/m²)</th><th>F1</th><th>F2</th><th>F3</th><th>Homogeneizado Xi (R$/m²)</th><th>Chauvenet</th></tr>';
+    (c.elementos||[]).forEach(function(el,i){ if(el.raw==null)return;
+      h+='<tr><td>IMÓVEL '+(i+1<10?"0":"")+(i+1)+'</td><td>'+fmt2(el.raw)+'</td><td>'+fmt2(el.f1)+'</td><td>'+fmt2(el.f2)+'</td><td>'+fmt2(el.f3)+'</td><td>'+fmt2(el.xi)+'</td><td>'+(el.ok?'pertinente':'excluída')+'</td></tr>'; });
+    h+='</table>';
+    h+=P('<b>5.1) Média (X):</b> '+fmt2(c.X)+' R$/m². <b>Desvio padrão (S):</b> '+fmt2(c.S)+'.');
+    h+=P('<b>5.2) Critério de Chauvenet:</b> para '+c.nSan+' elementos, o valor crítico é VC = '+fmt2(c.VC)+'. Considera-se pertinente o elemento cujo quociente d = |Xi − X| / S seja inferior a VC.'+(c.removidos.length?(' Foram excluídos '+c.removidos.length+' elemento(s) por não atenderem ao critério.'):' Todos os elementos foram considerados pertinentes.'));
+    h+=P('<b>5.3) Intervalo de confiança (80%):</b> pela distribuição t de Student, com '+(c.nSan-1)+' graus de liberdade, tc = '+fmt2(c.tc)+'. Li = X − tc·S/√(n−1) = '+fmtBR(c.Li)+'/m²; Ls = X + tc·S/√(n−1) = '+fmtBR(c.Ls)+'/m².');
+    h+=P('<b>5.4) Campo de arbítrio:</b> arbitrado em ±10% em torno da média, de '+fmtBR(c.campoLi)+'/m² a '+fmtBR(c.campoLs)+'/m².');
+    h+=P('<b>5.5) Valor unitário do imóvel avaliando:</b> adotada a média dos elementos situados dentro do campo de arbítrio, resultando em '+fmtBR(c.unitCampo)+'/m² (equivalente a '+fmtBR(c.unitHa)+'/ha).');
+  }
   h+='<h2>6) Determinação do valor do imóvel</h2>';
   h+=P('<b>6.1) Valor de mercado:</b> '+esc(a.valorMercado||(c.valorMercado!=null?fmtBR(c.valorMercado):"—"))+(c.unitHa?(' (base '+fmtBR(c.unitHa)+'/ha)'):'')+'.');
   h+=P('<b>6.2) Valor de liquidez:</b> '+esc(a.valorLiquidez||(c.valorLiquidez!=null?fmtBR(c.valorLiquidez):"—"))+'.');
@@ -2154,7 +2259,7 @@ function salvarCompromAcao(){
   if(!editComprom.convidado){ alert("Escolha com quem é o agendamento."); return; }
   if(!(editComprom.titulo||"").trim()){ alert("Informe o assunto."); return; }
   editComprom.propostoPor=user.nome; editComprom.status="Solicitado";
-  registrarMov(editComprom,"Agendamento solicitado por "+user.nome+"@sistema para "+brData(editComprom.data)+(editComprom.hora?(" "+editComprom.hora):""));
+  registrarMov(editComprom,"Agendamento solicitado por "+user.nome+" para "+brData(editComprom.data)+(editComprom.hora?(" "+editComprom.hora):""));
   compromissos.push(editComprom); salvarComprom(); var id=editComprom.id; editComprom=null;
   alert("Solicitação enviada."); view="compromissos"; comTab="lista"; render();
   setTimeout(function(){ if(confirm("Avisar o convidado pelo WhatsApp?")) avisarComprom(id); },150);
@@ -2175,8 +2280,8 @@ function compromVerHtml(){
   h+='<div class="card"><h2>Histórico</h2>'+((c.movimentos||[]).length?'<div class="timeline">'+c.movimentos.slice().reverse().map(function(m){return '<div class="tl-item"><div class="tl-when">'+brDH(m.quando)+' · <b>'+esc(m.quem)+'</b></div><div>'+esc(m.texto)+'</div></div>';}).join("")+'</div>':'<div class="muted small">—</div>')+'</div>';
   return h;
 }
-function aceitarComprom(id){ var c=comById(id); if(!c||!podeResponderC(c))return; c.status="Confirmado"; registrarMov(c,"Confirmado por "+user.nome+"@sistema para "+brData(c.data)+(c.hora?(" "+c.hora):"")); salvarComprom(); render(); setTimeout(function(){ if(confirm("Avisar o outro participante?")) avisarComprom(id); },150); }
-function sugerirDataComprom(id){ var c=comById(id); if(!c||!podeResponderC(c))return; var nd=prompt("Nova data sugerida (AAAA-MM-DD):",c.data); if(!nd)return; var nh=prompt("Hora (opcional, HH:MM):",c.hora||"")||""; c.data=nd; c.hora=nh; c.propostoPor=user.nome; c.status="Sugerida nova data"; registrarMov(c,"Nova data sugerida por "+user.nome+"@sistema: "+brData(nd)+(nh?(" "+nh):"")); salvarComprom(); render(); setTimeout(function(){ if(confirm("Avisar o outro participante?")) avisarComprom(id); },150); }
+function aceitarComprom(id){ var c=comById(id); if(!c||!podeResponderC(c))return; c.status="Confirmado"; registrarMov(c,"Confirmado por "+user.nome+" para "+brData(c.data)+(c.hora?(" "+c.hora):"")); salvarComprom(); render(); setTimeout(function(){ if(confirm("Avisar o outro participante?")) avisarComprom(id); },150); }
+function sugerirDataComprom(id){ var c=comById(id); if(!c||!podeResponderC(c))return; var nd=prompt("Nova data sugerida (AAAA-MM-DD):",c.data); if(!nd)return; var nh=prompt("Hora (opcional, HH:MM):",c.hora||"")||""; c.data=nd; c.hora=nh; c.propostoPor=user.nome; c.status="Sugerida nova data"; registrarMov(c,"Nova data sugerida por "+user.nome+": "+brData(nd)+(nh?(" "+nh):"")); salvarComprom(); render(); setTimeout(function(){ if(confirm("Avisar o outro participante?")) avisarComprom(id); },150); }
 function recusarComprom(id){ var c=comById(id); if(!c)return; if(!confirm("Recusar este agendamento?"))return; c.status="Recusado"; registrarMov(c,"Recusado por "+user.nome); salvarComprom(); render(); }
 function cancelarComprom(id){ var c=comById(id); if(!c)return; if(!confirm("Cancelar este agendamento?"))return; c.status="Cancelado"; registrarMov(c,"Cancelado por "+user.nome); salvarComprom(); render(); }
 function foneComprom(c, alvo){ // alvo: 'convidado' | 'solicitante'
@@ -2185,10 +2290,10 @@ function foneComprom(c, alvo){ // alvo: 'convidado' | 'solicitante'
 }
 function avisarComprom(id){ var c=comById(id); if(!c)return;
   var alvo = eqNome(c.solicitante,user.nome) ? 'convidado' : 'solicitante';
-  var msg="*"+(cfg.brand||"Sistema")+"@sistema* — Agendamento\n📆 "+(c.titulo||"")+"@sistema\n📅 "+brData(c.data)+(c.hora?(" "+c.hora):"")+(c.local?("\n📍 "+c.local):"")+"@sistema\n📌 "+c.status;
+  var msg="*"+(cfg.brand||"Sistema")+"* — Agendamento\n📆 "+(c.titulo||"")+"\n📅 "+brData(c.data)+(c.hora?(" "+c.hora):"")+(c.local?("\n📍 "+c.local):"")+"\n📌 "+c.status;
   abrirWa2(foneComprom(c,alvo), msg);
 }
-function gcalComprom(c){ var t=encodeURIComponent(c.titulo||"Agendamento"); var d=(c.data||"").replace(/-/g,""); var dates=d?("&dates="+d+"@sistema/"+d):""; var det=encodeURIComponent(c.descricao||""); var loc=encodeURIComponent(c.local||""); return "https://calendar.google.com/calendar/render?action=TEMPLATE&text="+t+dates+"@sistema&details="+det+"@sistema&location="+loc; }
+function gcalComprom(c){ var t=encodeURIComponent(c.titulo||"Agendamento"); var d=(c.data||"").replace(/-/g,""); var dates=d?("&dates="+d+"/"+d):""; var det=encodeURIComponent(c.descricao||""); var loc=encodeURIComponent(c.local||""); return "https://calendar.google.com/calendar/render?action=TEMPLATE&text="+t+dates+"&details="+det+"&location="+loc; }
 
 /* =========================================================================
    COMUNIDADE — cooperativas/sindicatos/associações ↔ produtores
@@ -2269,11 +2374,11 @@ function revogarConsent(id){ var v=vincById(id); if(!v)return; if(!confirm('Revo
 function verDadosCompart(id){
   var v=vincById(id); if(!v||!v.consent||!v.consent.aceito){ alert('Este produtor não compartilhou dados.'); return; }
   logAcesso('Visualizou dados do produtor', v.produtor);
-  var d=v.consent.dados||{}; var t="DADOS COMPARTILHADOS — "+v.produtor+"@sistema\nAutorizado em "+brDH(v.consent.quando)+"@sistema\n\n";
-  if(d.propriedade) t+="🏡 Propriedade: "+(d.propriedade.propriedade||"—")+"@sistema · "+(d.propriedade.municipioUf||"")+"@sistema · matr. "+(d.propriedade.matricula||"—")+"@sistema · "+(d.propriedade.area||"—")+"@sistema ha\n";
-  if(d.contato) t+="📞 Contato: "+(d.contato.nome||"")+"@sistema "+(d.contato.fone||"")+"@sistema\n";
-  if(d.diagnosticos) t+="📋 Diagnósticos: "+(d.diagnosticos.length?d.diagnosticos.map(function(x){return x.imovel+"@sistema ("+x.status+"@sistema)";}).join("; "):"nenhum")+"@sistema\n";
-  if(d.documentos) t+="🗄️ Documentos: "+(d.documentos.length?d.documentos.join(", "):"nenhum")+"@sistema\n";
+  var d=v.consent.dados||{}; var t="DADOS COMPARTILHADOS — "+v.produtor+"\nAutorizado em "+brDH(v.consent.quando)+"\n\n";
+  if(d.propriedade) t+="🏡 Propriedade: "+(d.propriedade.propriedade||"—")+" · "+(d.propriedade.municipioUf||"")+" · matr. "+(d.propriedade.matricula||"—")+" · "+(d.propriedade.area||"—")+" ha\n";
+  if(d.contato) t+="📞 Contato: "+(d.contato.nome||"")+" "+(d.contato.fone||"")+"\n";
+  if(d.diagnosticos) t+="📋 Diagnósticos: "+(d.diagnosticos.length?d.diagnosticos.map(function(x){return x.imovel+" ("+x.status+")";}).join("; "):"nenhum")+"\n";
+  if(d.documentos) t+="🗄️ Documentos: "+(d.documentos.length?d.documentos.join(", "):"nenhum")+"\n";
   t+="\n— Termo aceito: "+(v.consent.termo||"");
   alert(t);
 }
@@ -2329,7 +2434,7 @@ function enviarComunicado(){
 function excluirComunicado(id){ if(!confirm('Excluir este comunicado?'))return; apiRemover('comunicados',id); var i=comunicados.findIndex(function(x){return x.id===id;}); if(i>-1)comunicados.splice(i,1); renderMain(); }
 function responderMsgCoop(id){ var mm=msgCoopById(id); if(!mm)return; var r=prompt('Resposta ao produtor:',mm.resposta||''); if(r==null)return; mm.resposta=r; salvarMensagensCoop(); renderMain(); setTimeout(function(){ if(confirm('Avisar o produtor pelo WhatsApp?')) avisarProdutorWa(id); },150); }
 function statusPedidoCoop(id,st){ var mm=msgCoopById(id); if(!mm)return; mm.status=st; salvarMensagensCoop(); renderMain(); }
-function avisarProdutorWa(id){ var mm=msgCoopById(id); if(!mm)return; var msg="*"+(cfg.brand||"Sistema")+"@sistema* — "+(mm.tipo==='pedido'?'Pedido':'Mensagem')+"@sistema\n"+(mm.tipo==='pedido'?('🛒 '+mm.item+(mm.qtd?(' ('+mm.qtd+')'):'')):('✉️ '+(mm.texto||'')))+(mm.resposta?("\n📝 "+mm.resposta):"")+(mm.status?("\n📌 "+mm.status):""); abrirWa2(foneDir(mm.produtor), msg); }
+function avisarProdutorWa(id){ var mm=msgCoopById(id); if(!mm)return; var msg="*"+(cfg.brand||"Sistema")+"* — "+(mm.tipo==='pedido'?'Pedido':'Mensagem')+"\n"+(mm.tipo==='pedido'?('🛒 '+mm.item+(mm.qtd?(' ('+mm.qtd+')'):'')):('✉️ '+(mm.texto||'')))+(mm.resposta?("\n📝 "+mm.resposta):"")+(mm.status?("\n📌 "+mm.status):""); abrirWa2(foneDir(mm.produtor), msg); }
 
 /* =========================================================================
    DOCUMENTOS AO PRODUTOR — profissional técnico envia doc; produtor baixa
@@ -2594,7 +2699,7 @@ function mudarSolic(id,st){ var s=solicitacoes.find(function(x){return x.id===id
    MARKETPLACE — Classificados (compra/venda) + Serviços (credenciados)
    Monetização: anúncio em destaque (pago) + credenciamento de prestadores.
    ========================================================================= */
-function whatsFone(fone,msg){ var w=foneWhats(fone); if(!w){alert("Sem telefone.");return;} window.open("https://wa.me/"+w+"@sistema?text="+encodeURIComponent(msg||""),"_blank"); }
+function whatsFone(fone,msg){ var w=foneWhats(fone); if(!w){alert("Sem telefone.");return;} window.open("https://wa.me/"+w+"?text="+encodeURIComponent(msg||""),"_blank"); }
 /* ---- Classificados ---- */
 /* ---- banner rotativo de anúncios em destaque (Portal) ---- */
 function anunciosDestaque(){ var d=classificados.filter(function(a){return a.destaque;}); if(!d.length) d=classificados.slice(); return d.sort(function(a,b){return (b.criadoEm||"").localeCompare(a.criadoEm||"");}).slice(0,8); }
@@ -2677,7 +2782,7 @@ function servicosHtml(){
     '<div style="height:8px"></div><button class="btn sm" onclick="addPrestador()">Adicionar</button></div>'):'';
   return filtros+'<div class="grid g2">'+cards+'</div><div style="height:12px"></div>'+addForm;
 }
-function solicitarDoPrestador(nome,cat){ solicitacoes.push({id:uid(),criadoEm:new Date().toISOString(),produtor:user.nome,tipo:"Serviço (prestador)",item:cat+"@sistema — "+nome,valor:"",status:"Nova",obs:""}); salvarSolic(); alert("Solicitação enviada para o escritório intermediar."); }
+function solicitarDoPrestador(nome,cat){ solicitacoes.push({id:uid(),criadoEm:new Date().toISOString(),produtor:user.nome,tipo:"Serviço (prestador)",item:cat+" — "+nome,valor:"",status:"Nova",obs:""}); salvarSolic(); alert("Solicitação enviada para o escritório intermediar."); }
 function addPrestador(){ var n=(document.getElementById("npNome")||{}).value; if(!n||!n.trim()){alert("Informe o nome.");return;}
   prestadores.push({id:uid(),nome:n.trim(),cat:document.getElementById("npCat").value,cidade:(document.getElementById("npCidade")||{}).value||"",fone:(document.getElementById("npFone")||{}).value||"",cred:true,destaque:false,desc:(document.getElementById("npDesc")||{}).value||""}); salvarPrest(); renderMain(); }
 function toggleCred(id){ var p=prestadores.find(function(x){return x.id===id;}); if(p){p.cred=!p.cred; salvarPrest(); renderMain();} }
@@ -2869,13 +2974,17 @@ try{ montarPWADinamico(); }catch(e){}
 render();
 carregarCfg().then(function(){
   var s=null; try{ s=JSON.parse(localStorage.getItem('agt_sess')||'null'); }catch(e){}
-  if(s && s.token && s.user){                 // login automático (sessão salva neste dispositivo)
+  if(sessaoValida(s)){                          // login automático só dentro de 1h de atividade e no mesmo dia
     conviteToken=null;
-    user=s.user; TOKEN=s.token;
+    user=s.user; TOKEN=s.token; _ultAtiv=Date.now(); salvarSessao();
     if(user.pinTrocadoEm){ try{ var dias=Math.floor((Date.now()-new Date(String(user.pinTrocadoEm).slice(0,10)+'T00:00:00').getTime())/86400000); if(dias>=60) user.pinVencido=true; }catch(e){} }
     view=navFor(user)[0]||""; carregando=true; render();
     carregarDados().then(function(){ carregando=false; render(); });
-  } else if(conviteToken){ iniciarConvite(); }   // link mágico do produtor
-  else { if(!user) render(); }
+  } else {
+    if(s) limparSessao();
+    if(!conviteToken){ try{ var _cv=localStorage.getItem('agt_convite'); if(_cv) conviteToken=_cv; }catch(e){} }
+    if(conviteToken){ iniciarConvite(); }              // produtor: volta pela senha do convite
+    else if(!user){ render(); }                        // sessão expirada (1h ou novo dia) -> pede senha
+  }
 });
 </script>
